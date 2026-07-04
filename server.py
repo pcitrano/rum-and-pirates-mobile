@@ -4,13 +4,15 @@ import uuid
 import json, os
 import time
 import threading
+from server_game_setup import ServerGameSetup
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
- 
+
 rooms = {}  # { room_id: { "game_state": {}, "players": [] } }
 
 STATS_FILE = "/data/stats.json"
+board_setup = ServerGameSetup(assets_dir="assets/tiles")
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 
@@ -106,6 +108,25 @@ def on_update_state(data):
 def on_start_game(data):
     room_id = data["room_id"]
     game_state = data["game_state"]
+    rooms[room_id]["game_state"] = game_state
+    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+
+@socketio.on("new_game")
+def on_new_game(data):
+    """
+    Phase 1 of server-side migration: the server generates the board
+    (spaces, captain_graph, alley_lookup, coin_lookup) instead of the
+    desktop host. Everything else in game_state still comes from the
+    client for now — this only replaces board generation.
+    """
+    room_id = data["room_id"]
+    if room_id not in rooms:
+        emit("error", {"message": "Room not found"})
+        return
+
+    game_state = data.get("game_state", {})
+    game_state = board_setup.generate_board(game_state)
+
     rooms[room_id]["game_state"] = game_state
     socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
 
