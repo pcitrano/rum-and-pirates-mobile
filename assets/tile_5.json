@@ -1,0 +1,31 @@
+{
+    "name": "tile_5",
+    "num_tile": 5,
+    "spaces": [
+        {"id":117, "x":0.04, "y":0.2367, "type":"edge", "neighbors":[118]},
+        {"id":118, "x":0.1533, "y":0.3767, "type":"normal", "neighbors":[117,119]},
+        {"id":119, "x":0.3233, "y":0.43, "type":"normal", "neighbors":[118,120]},
+        {"id":120, "x":0.5267, "y":0.3567, "type":"blue_pub", "neighbors":[119,121,126,129,131]},
+        {"id":121, "x":0.6733, "y":0.2867, "type":"normal", "neighbors":[120,122]},
+        {"id":122, "x":0.83, "y":0.2233, "type":"green_map", "neighbors":[121,123,128]},
+        {"id":123, "x":0.98, "y":0.2367, "type":"edge", "neighbors":[122]},
+        {"id":124, "x":0.2467, "y":0.0167, "type":"edge", "neighbors":[125]},
+        {"id":125, "x":0.3, "y":0.1033, "type":"normal", "neighbors":[124,126]},
+        {"id":126, "x":0.3967, "y":0.23, "type":"normal", "neighbors":[125,120]},
+        {"id":127, "x":0.76, "y":0.0167, "type":"edge", "neighbors":[128]},
+        {"id":128, "x":0.8, "y":0.0767, "type":"normal", "neighbors":[122,127]},
+        {"id":129, "x":0.4867, "y":0.5233, "type":"normal", "neighbors":[120,130]},
+        {"id":130, "x":0.4333, "y":0.63, "type":"normal", "neighbors":[129,135]},
+        {"id":131, "x":0.6733, "y":0.4933, "type":"normal", "neighbors":[120,132]},
+        {"id":132, "x":0.77, "y":0.6033, "type":"normal", "neighbors":[131,138]},
+        {"id":133, "x":0.04, "y":0.75, "type":"edge", "neighbors":[134]},
+        {"id":134, "x":0.1767, "y":0.68, "type":"normal", "neighbors":[133,135]},
+        {"id":135, "x":0.33, "y":0.7567, "type":"coin", "neighbors":[130,134,136]},
+        {"id":136, "x":0.2467, "y":0.88, "type":"normal", "neighbors":[135,137]},
+        {"id":137, "x":0.25, "y":0.9733, "type":"edge", "neighbors":[136]},
+        {"id":138, "x":0.8667, "y":0.7567, "type":"recruit", "neighbors":[132,139,140]},
+        {"id":139, "x":0.9767, "y":0.7433, "type":"edge", "neighbors":[138]},
+        {"id":140, "x":0.7933, "y":0.9033, "type":"normal", "neighbors":[138,141]},
+        {"id":141, "x":0.76, "y":0.9767, "type":"edge", "neighbors":[140]}
+    ]
+}
