@@ -5,6 +5,7 @@ import json, os
 import time
 import threading
 from server_game_setup import ServerGameSetup
+from server_gameplay import ServerGameplay
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
@@ -13,6 +14,7 @@ rooms = {}  # { room_id: { "game_state": {}, "players": [] } }
 
 STATS_FILE = "/data/stats.json"
 board_setup = ServerGameSetup(tiles_dir="assets/tiles", cards_path="assets/cards.json")
+gameplay = ServerGameplay()
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 
@@ -114,6 +116,54 @@ def on_update_state(data):
     room_id = data["room_id"]
     rooms[room_id]["game_state"] = data["game_state"]
     emit("state_updated", {"game_state": data["game_state"]}, room=room_id, include_self=False)
+
+@socketio.on("player_action")
+def on_player_action(data):
+    """
+    Executes core turn actions server-side: move, rest, go_on_board,
+    move_again. Any action not yet migrated is relayed to other clients
+    as before, in case the desktop host still handles it locally.
+    """
+    room_id = data["room_id"]
+    action_type = data.get("type")
+
+    if room_id not in rooms or rooms[room_id]["game_state"] is None:
+        emit("error", {"message": "Room not found or game not started"})
+        return
+
+    game_state = rooms[room_id]["game_state"]
+
+    if action_type == "move":
+        destination_id = data.get("destination_id")
+        result = gameplay.move_captain(game_state, destination_id)
+
+        if result is None:
+            emit("error", {"message": "Dark alley moves aren't supported yet"})
+            return
+        if result is False:
+            emit("error", {"message": "Illegal move"})
+            return
+
+        # Auto-confirm — the web client already shows a confirm dialog
+        # before sending the move, so no separate confirm_move round trip.
+        gameplay.confirm_move(game_state)
+
+    elif action_type == "rest":
+        gameplay.rest(game_state)
+
+    elif action_type == "go_on_board":
+        gameplay.go_on_board(game_state)
+
+    elif action_type == "move_again":
+        gameplay.move_again(game_state)
+
+    else:
+        # Not yet migrated — relay to other clients (e.g. desktop host)
+        emit("action_received", data, room=room_id, include_self=False)
+        return
+
+    rooms[room_id]["game_state"] = game_state
+    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
 
 @socketio.on("start_game")
 def on_start_game(data):

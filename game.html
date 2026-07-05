@@ -510,7 +510,7 @@ function renderBoard() {
     //  ctx.fillStyle = color + "cc";
     //  ctx.fill();
     //}
-  //});
+  });
 
   // Draw occupied paths — players don't have board positions, only occupied paths
   const occupiedPaths = gameState.occupied_paths || [];
@@ -530,7 +530,7 @@ function renderBoard() {
   });
 
   ctx.restore();
-}
+};
 
 // ── Touch / pan / zoom ────────────────────────────────────────────────────────
 function initBoardSize() {
