@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rum & Pirates</title>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #0d1b2a;
+    --parchment: #f2dfa7;
+    --parch-dark:#e8c97a;
+    --wood:      #6b3a1f;
+    --wood-light:#8b5e3c;
+    --gold:      #c9922a;
+    --gold-light:#e8b84b;
+    --ink:       #1e1206;
+    --red:       #8b1a1a;
+    --rope:      #a07840;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: var(--navy);
+    background-image:
+      radial-gradient(ellipse at 20% 50%, #0a2540 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, #1a0a05 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+    font-family: 'Crimson Text', Georgia, serif;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .site-header h1 {
+    font-family: 'Pirata One', cursive;
+    font-size: clamp(2.4rem, 7vw, 4.2rem);
+    color: var(--gold-light);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 40px rgba(201,146,42,0.3);
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .site-header .tagline {
+    font-style: italic;
+    color: #b0956a;
+    font-size: 1.1rem;
+    margin-top: 4px;
+  }
+
+  /* ── Rope border panel ── */
+  .panel {
+    background: var(--parchment);
+    border-radius: 4px;
+    position: relative;
+    padding: 28px 28px 24px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(160,120,64,0.15);
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 2px;
+    border: 3px dashed var(--rope);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .panel-title {
+    font-family: 'Pirata One', cursive;
+    font-size: 1.7rem;
+    color: var(--wood);
+    margin-bottom: 20px;
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Form elements ── */
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--wood);
+    margin-bottom: 4px;
+    margin-top: 14px;
+  }
+  label:first-of-type { margin-top: 0; }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    width: 100%;
+    padding: 10px 12px;
+    background: #fffbf0;
+    border: 2px solid var(--wood-light);
+    border-radius: 3px;
+    font-family: 'Crimson Text', serif;
+    font-size: 1.1rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,146,42,0.2);
+  }
+  select { cursor: pointer; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    margin-top: 18px;
+    border: none;
+    border-radius: 3px;
+    font-family: 'Pirata One', cursive;
+    font-size: 1.25rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+    position: relative;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: linear-gradient(160deg, var(--gold-light), var(--gold));
+    color: var(--ink);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-secondary {
+    background: linear-gradient(160deg, var(--wood-light), var(--wood));
+    color: var(--parchment);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+  }
+  .btn-secondary:hover { filter: brightness(1.12); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--wood);
+    border: 2px solid var(--wood-light);
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    padding: 8px;
+    margin-top: 10px;
+  }
+  .btn-ghost:hover { background: rgba(107,58,31,0.08); }
+
+  /* ── Screen management ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Main menu grid ── */
+  .menu-grid { display: flex; flex-direction: column; gap: 10px; }
+  .menu-grid .btn { margin-top: 0; }
+
+  /* ── Divider ── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0 4px;
+    color: var(--wood-light);
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--wood-light);
+    opacity: 0.5;
+  }
+
+  /* ── Room list ── */
+  .room-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+  .room-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fffbf0;
+    border: 2px solid var(--wood-light);
+    border-radius: 3px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .room-row:hover { background: var(--parch-dark); border-color: var(--gold); }
+  .room-row.selected { background: var(--parch-dark); border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,146,42,0.3); }
+  .room-code { font-family: 'Pirata One', cursive; font-size: 1.1rem; color: var(--wood); }
+  .room-meta { font-size: 0.95rem; color: #5a3e1b; font-style: italic; }
+  .room-empty { text-align: center; font-style: italic; color: #7a6040; padding: 16px 0; }
+
+  /* ── Lobby waiting room ── */
+  .player-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+  .player-list li {
+    background: #fffbf0;
+    border: 1px solid var(--wood-light);
+    border-radius: 3px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.05rem;
+  }
+  .player-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #4caf50;
+    flex-shrink: 0;
+  }
+  .room-code-display {
+    text-align: center;
+    font-family: 'Pirata One', cursive;
+    font-size: 2rem;
+    letter-spacing: 0.18em;
+    color: var(--wood);
+    background: #fffbf0;
+    border: 2px dashed var(--rope);
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 16px;
+  }
+  .room-code-display small {
+    display: block;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.85rem;
+    letter-spacing: 0;
+    color: #7a6040;
+    margin-bottom: 2px;
+  }
+
+  /* ── Error / status ── */
+  .error-msg {
+    color: var(--red);
+    font-style: italic;
+    font-size: 0.95rem;
+    margin-top: 8px;
+    min-height: 1.2em;
+    text-align: center;
+  }
+  .status-msg {
+    color: var(--wood);
+    font-style: italic;
+    font-size: 0.95rem;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* ── Skull divider ornament ── */
+  .ornament {
+    text-align: center;
+    color: var(--rope);
+    font-size: 1.1rem;
+    opacity: 0.6;
+    margin: 6px 0 2px;
+    letter-spacing: 0.5em;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 3px solid var(--parch-dark);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 400px) {
+    .panel { padding: 20px 16px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>Rum &amp; Pirates</h1>
+  <p class="tagline">Set sail, plunder wisely.</p>
+</header>
+
+<!-- ══════════════ MAIN MENU ══════════════ -->
+<div id="screen-main" class="screen active panel">
+  <p class="panel-title">⚓ Main Menu</p>
+  <div class="menu-grid">
+    <button class="btn btn-primary" onclick="showScreen('screen-games')">Games</button>
+    <button class="btn btn-secondary" onclick="showScreen('screen-stats')">Statistics</button>
+    <button class="btn btn-ghost" onclick="showScreen('screen-settings')">Settings</button>
+  </div>
+</div>
+
+<!-- ══════════════ GAMES MENU ══════════════ -->
+<div id="screen-games" class="screen panel">
+  <p class="panel-title">⚔ Games</p>
+  <div class="menu-grid">
+    <button class="btn btn-primary" onclick="showScreen('screen-host')">Host a Game</button>
+    <button class="btn btn-secondary" onclick="openJoin()">Join a Game</button>
+    <button class="btn btn-secondary" onclick="openActiveGames()">Rejoin Active Game</button>
+  </div>
+  <button class="btn btn-ghost" onclick="showScreen('screen-main')">← Back</button>
+</div>
+
+<!-- ══════════════ HOST ══════════════ -->
+<div id="screen-host" class="screen panel">
+  <p class="panel-title">🏴‍☠️ Host a Game</p>
+  <label for="host-name">Your Name</label>
+  <input type="text" id="host-name" placeholder="Captain...">
+  <label for="host-players">Number of Players</label>
+  <select id="host-players">
+    <option value="2">2 Players</option>
+    <option value="3">3 Players</option>
+    <option value="4" selected>4 Players</option>
+    <option value="5">5 Players</option>
+  </select>
+  <label for="host-start">Starting Positions</label>
+  <select id="host-start">
+    <option value="standard">Standard</option>
+    <option value="random">Random</option>
+  </select>
+  <button class="btn btn-primary" onclick="hostGame()">Create Room</button>
+  <button class="btn btn-ghost" onclick="showScreen('screen-games')">← Back</button>
+  <p class="error-msg" id="host-error"></p>
+</div>
+
+<!-- ══════════════ JOIN ══════════════ -->
+<div id="screen-join" class="screen panel">
+  <p class="panel-title">🗺 Join a Game</p>
+  <label for="join-name">Your Name</label>
+  <input type="text" id="join-name" placeholder="Pirate name...">
+
+  <div class="divider">open rooms</div>
+  <div class="room-list" id="join-room-list">
+    <p class="room-empty"><span class="spinner"></span> Looking for ships...</p>
+  </div>
+
+  <div class="divider">or enter code</div>
+  <input type="text" id="join-code" placeholder="e.g. A3F9BC" maxlength="6"
+    style="text-transform:uppercase;letter-spacing:0.15em;font-family:'Pirata One',cursive;font-size:1.2rem;">
+
+  <button class="btn btn-primary" onclick="joinGame()">Board Ship</button>
+  <button class="btn btn-ghost" onclick="showScreen('screen-games')">← Back</button>
+  <p class="error-msg" id="join-error"></p>
+</div>
+
+<!-- ══════════════ ACTIVE GAMES ══════════════ -->
+<div id="screen-active" class="screen panel">
+  <p class="panel-title">⚓ Rejoin Active Game</p>
+  <label for="rejoin-name">Your Name</label>
+  <input type="text" id="rejoin-name" placeholder="Your pirate name...">
+  <div style="height:12px"></div>
+  <div class="room-list" id="active-room-list">
+    <p class="room-empty"><span class="spinner"></span> Scanning the seas...</p>
+  </div>
+  <p class="error-msg" id="rejoin-error"></p>
+  <button class="btn btn-ghost" onclick="showScreen('screen-games')">← Back</button>
+</div>
+
+<!-- ══════════════ LOBBY (waiting room) ══════════════ -->
+<div id="screen-lobby" class="screen panel">
+  <p class="panel-title">⚓ Waiting for Crew</p>
+  <div class="room-code-display">
+    <small>Room Code</small>
+    <span id="lobby-code">------</span>
+  </div>
+  <p style="font-size:0.95rem;color:#5a3e1b;margin-bottom:4px;font-weight:600;">Crew aboard:</p>
+  <ul class="player-list" id="lobby-players"></ul>
+  <p class="status-msg" id="lobby-status">Waiting for the captain to set sail...</p>
+
+  <div id="host-start-controls" style="display:none;margin-top:14px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:14px;">
+      <input type="checkbox" id="lobby-characters" style="width:18px;height:18px;">
+      <span>Play with Characters</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
+      <input type="checkbox" id="lobby-random-start" style="width:18px;height:18px;">
+      <span>Random Starting Position</span>
+    </label>
+    <button class="btn btn-primary" onclick="startGame()" style="margin-top:16px;">Set Sail! ⚓</button>
+  </div>
+
+  <div class="ornament">✦ ✦ ✦</div>
+  <p class="error-msg" id="lobby-error"></p>
+</div>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div id="screen-settings" class="screen panel">
+  <p class="panel-title">⚙ Settings</p>
+  <label for="setting-name">Default Player Name</label>
+  <input type="text" id="setting-name" placeholder="Your pirate name...">
+  <label for="setting-start">Default Starting Position</label>
+  <select id="setting-start">
+    <option value="standard">Standard</option>
+    <option value="random">Random</option>
+  </select>
+  <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+  <button class="btn btn-ghost" onclick="showScreen('screen-main')">← Back</button>
+  <p class="status-msg" id="settings-status"></p>
+</div>
+
+<!-- ══════════════ STATS ══════════════ -->
+<div id="screen-stats" class="screen panel">
+  <p class="panel-title">📜 Statistics</p>
+  <div id="stats-content">
+    <p class="room-empty"><span class="spinner"></span> Loading the ledger...</p>
+  </div>
+  <button class="btn btn-ghost" onclick="showScreen('screen-main')">← Back</button>
+</div>
+
+<script>
+const SERVER = "https://rum-and-pirates-server-production.up.railway.app";
+let socket = null;
+let myName = "";
+let myRoomId = null;
+let myPlayerIndex = 0;
+let selectedRoomId = null;
+let isHost = false;
+
+function launchGame() {
+  // Store in localStorage so game.html can read them
+  localStorage.setItem("rapName", myName);
+  localStorage.setItem("rapRoom", myRoomId);
+  localStorage.setItem("rapIndex", myPlayerIndex);
+  window.location.href = `/game?name=${encodeURIComponent(myName)}&room=${myRoomId}&index=${myPlayerIndex}`;
+}
+
+// ── Settings ──────────────────────────────────────────
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem("rapSettings") || "{}");
+  } catch { return {}; }
+}
+function saveSettings() {
+  const s = {
+    name: document.getElementById("setting-name").value.trim(),
+    start: document.getElementById("setting-start").value
+  };
+  localStorage.setItem("rapSettings", JSON.stringify(s));
+  document.getElementById("settings-status").textContent = "Settings saved!";
+  setTimeout(() => document.getElementById("settings-status").textContent = "", 2000);
+}
+function applySettings() {
+  const s = loadSettings();
+  if (s.name) {
+    ["host-name","join-name","rejoin-name"].forEach(id => {
+      document.getElementById(id).value = s.name;
+    });
+    document.getElementById("setting-name").value = s.name;
+  }
+  if (s.start) {
+    document.getElementById("setting-start").value = s.start;
+  }
+}
+
+// ── Screen routing ─────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ── Socket connection ──────────────────────────────────
+function connectSocket(callback) {
+  if (socket && socket.connected) { callback(); return; }
+  socket = io(SERVER, { transports: ["websocket"] });
+  socket.on("connect", () => { console.log("Connected"); callback(); });
+  socket.on("connect_error", () => setError("host-error", "Could not reach the server."));
+
+  socket.on("room_created", (data) => {
+    myRoomId = data.room_id;
+    myPlayerIndex = 0;
+    document.getElementById("lobby-code").textContent = data.room_id;
+    updateLobbyPlayers([myName]);
+    document.getElementById("lobby-status").textContent = "Waiting for crew to join...";
+    document.getElementById("host-start-controls").style.display = "block";
+    showScreen("screen-lobby");
+  });
+
+  socket.on("room_joined", (data) => {
+    myRoomId = data.room_id;
+    myPlayerIndex = data.player_index;
+    document.getElementById("lobby-code").textContent = data.room_id;
+    document.getElementById("lobby-status").textContent = data.reconnected
+      ? "Rejoined! Waiting for the game to continue..."
+      : "Aboard! Waiting for the captain to set sail...";
+    document.getElementById("host-start-controls").style.display = isHost ? "block" : "none";
+    showScreen("screen-lobby");
+    // If reconnecting to an active game, go straight to game view
+    if (data.reconnected) launchGame();
+  });
+
+  socket.on("player_joined", (data) => {
+    updateLobbyPlayers(data.players);
+  });
+
+  socket.on("state_updated", (data) => {
+    // Game has started — go to game view
+    launchGame();
+  });
+
+  socket.on("rejoined", (data) => {
+    myRoomId = data.room_id;
+    document.getElementById("lobby-code").textContent = data.room_id;
+    document.getElementById("lobby-status").textContent = "Rejoined! Waiting for the game to continue...";
+    showScreen("screen-lobby");
+  });
+
+  socket.on("rejoin_error", (data) => {
+    setError("rejoin-error", data.message);
+  });
+
+  socket.on("error", (data) => {
+    setError("join-error", data.message || "Could not join room.");
+  });
+}
+
+// ── Host ───────────────────────────────────────────────
+function hostGame() {
+  const name = document.getElementById("host-name").value.trim();
+  const players = document.getElementById("host-players").value;
+  const start = document.getElementById("host-start").value;
+  if (!name) { setError("host-error", "Enter your pirate name first."); return; }
+  setError("host-error", "");
+  myName = name;
+  isHost = true;
+  connectSocket(() => {
+    socket.emit("create_room", { name, max_players: parseInt(players), random_start: start === "random" });
+  });
+}
+
+function startGame() {
+  if (!isHost || !myRoomId) return;
+  const playWithCharacters = document.getElementById("lobby-characters").checked;
+  const randomStart = document.getElementById("lobby-random-start").checked;
+  document.getElementById("lobby-status").textContent = "Setting sail...";
+  socket.emit("new_game", {
+    room_id: myRoomId,
+    play_with_characters: playWithCharacters,
+    random_start: randomStart
+  });
+}
+
+// ── Join ───────────────────────────────────────────────
+function openJoin() {
+  selectedRoomId = null;
+  showScreen("screen-join");
+  fetchRooms();
+}
+
+function fetchRooms() {
+  const list = document.getElementById("join-room-list");
+  list.innerHTML = '<p class="room-empty"><span class="spinner"></span> Looking for ships...</p>';
+  fetch(`${SERVER}/rooms`)
+    .then(r => r.json())
+    .then(rooms => {
+      if (!rooms.length) {
+        list.innerHTML = '<p class="room-empty">No open rooms found. Be the first to set sail!</p>';
+        return;
+      }
+      list.innerHTML = "";
+      rooms.forEach(room => {
+        const row = document.createElement("div");
+        row.className = "room-row";
+        row.dataset.id = room.room_id;
+        const playerStr = room.players.length
+          ? room.players.join(", ")
+          : "Empty";
+        row.innerHTML = `<span class="room-code">${room.room_id}</span><span class="room-meta">${playerStr}</span>`;
+        row.onclick = () => selectRoom(room.room_id);
+        list.appendChild(row);
+      });
+    })
+    .catch(() => {
+      list.innerHTML = '<p class="room-empty">Could not reach the server.</p>';
+    });
+}
+
+function selectRoom(id) {
+  selectedRoomId = id;
+  document.getElementById("join-code").value = id;
+  document.querySelectorAll(".room-row").forEach(r => r.classList.remove("selected"));
+  const row = document.querySelector(`.room-row[data-id="${id}"]`);
+  if (row) row.classList.add("selected");
+}
+
+function joinGame() {
+  const name = document.getElementById("join-name").value.trim();
+  const code = (document.getElementById("join-code").value.trim() || selectedRoomId || "").toUpperCase();
+  if (!name) { setError("join-error", "Enter your pirate name first."); return; }
+  if (!code) { setError("join-error", "Select a room or enter a room code."); return; }
+  setError("join-error", "");
+  myName = name;
+  isHost = false;
+  connectSocket(() => {
+    socket.emit("join_room", { room_id: code, name });
+  });
+}
+
+// ── Active Games / Rejoin ──────────────────────────────
+function openActiveGames() {
+  showScreen("screen-active");
+  fetchActiveGames();
+}
+
+function fetchActiveGames() {
+  const list = document.getElementById("active-room-list");
+  list.innerHTML = '<p class="room-empty"><span class="spinner"></span> Scanning the seas...</p>';
+  fetch(`${SERVER}/games`)
+    .then(r => r.json())
+    .then(games => {
+      if (!games.length) {
+        list.innerHTML = '<p class="room-empty">No active games found.</p>';
+        return;
+      }
+      list.innerHTML = "";
+      const myStoredName = (loadSettings().name || "").toLowerCase();
+      games.forEach(game => {
+        const row = document.createElement("div");
+        row.className = "room-row";
+        const inGame = game.players.some(p => p.toLowerCase() === myStoredName);
+        if (inGame) row.classList.add("selected");
+        row.innerHTML = `<span class="room-code">${game.room_id}</span><span class="room-meta">${game.players.join(", ")}</span>`;
+        row.onclick = () => rejoinGame(game.room_id);
+        list.appendChild(row);
+      });
+    })
+    .catch(() => {
+      list.innerHTML = '<p class="room-empty">Could not reach the server.</p>';
+    });
+}
+
+function rejoinGame(roomId) {
+  const name = document.getElementById("rejoin-name").value.trim();
+  if (!name) { setError("rejoin-error", "Enter your pirate name first."); return; }
+  setError("rejoin-error", "");
+  myName = name;
+  myRoomId = roomId;
+  connectSocket(() => {
+    socket.emit("rejoin_room", { room_id: roomId, name });
+  });
+}
+
+// ── Lobby helpers ──────────────────────────────────────
+function updateLobbyPlayers(players) {
+  const ul = document.getElementById("lobby-players");
+  ul.innerHTML = players.map(p =>
+    `<li><span class="player-dot"></span>${p}</li>`
+  ).join("");
+}
+
+// ── Stats ──────────────────────────────────────────────
+function loadStats() {
+  fetch(`${SERVER}/stats`)
+    .then(r => r.json())
+    .then(stats => renderStats(stats))
+    .catch(() => {
+      document.getElementById("stats-content").innerHTML =
+        '<p class="room-empty">Could not load statistics.</p>';
+    });
+}
+
+function renderStats(stats) {
+  const players = stats.players || {};
+  const qualified = Object.entries(players).filter(([,d]) => d.games_played >= 3);
+  const el = document.getElementById("stats-content");
+  if (!qualified.length) {
+    el.innerHTML = '<p class="room-empty">No statistics yet. Play some games!</p>';
+    return;
+  }
+  const sorted = qualified.sort((a,b) => (b[1].elo||1200) - (a[1].elo||1200));
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:1rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--wood-light);">
+          <th style="text-align:left;padding:6px 4px;color:var(--wood);font-family:'Pirata One',cursive;">Player</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--wood);font-family:'Pirata One',cursive;">ELO</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--wood);font-family:'Pirata One',cursive;">W</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--wood);font-family:'Pirata One',cursive;">GP</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--wood);font-family:'Pirata One',cursive;">Win%</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sorted.map(([name, d], i) => {
+          const pct = d.games_played ? Math.round(d.wins / d.games_played * 100) : 0;
+          const bg = i % 2 === 0 ? "#fffbf0" : "transparent";
+          return `<tr style="background:${bg};">
+            <td style="padding:8px 4px;font-weight:600;">${name}</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Pirata One',cursive;color:var(--gold);">${d.elo||1200}</td>
+            <td style="text-align:center;padding:8px 4px;">${d.wins}</td>
+            <td style="text-align:center;padding:8px 4px;">${d.games_played}</td>
+            <td style="text-align:center;padding:8px 4px;">${pct}%</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+// ── Utilities ──────────────────────────────────────────
+function setError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = msg;
+}
+
+// ── Init ───────────────────────────────────────────────
+applySettings();
+
+// Load stats when that screen is opened
+document.getElementById("screen-stats").addEventListener("click", function onFirst() {
+  loadStats();
+  this.removeEventListener("click", onFirst);
+}, { once: false });
+
+// Reload stats each time stats screen becomes active
+const observer = new MutationObserver(() => {
+  if (document.getElementById("screen-stats").classList.contains("active")) {
+    loadStats();
+  }
+});
+observer.observe(document.getElementById("screen-stats"), { attributes: true, attributeFilter: ["class"] });
+</script>
+</body>
+</html>
