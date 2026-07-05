@@ -9,8 +9,9 @@ START_SPACE_ID = 20
 
 
 class ServerGameSetup:
-    def __init__(self, assets_dir="assets"):
-        self.assets_dir = assets_dir
+    def __init__(self, tiles_dir="assets/tiles", cards_path="assets/cards.json"):
+        self.tiles_dir = tiles_dir
+        self.cards_path = cards_path
         self.tiles = self.load_all_tiles()
         self.cards = self.load_cards()
 
