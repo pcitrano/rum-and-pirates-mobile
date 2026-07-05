@@ -855,7 +855,7 @@ function loadTileImages() {
         if (loaded === 9) resolve();
       };
       img.onerror = () => { loaded++; if (loaded === 9) resolve(); };
-      img.src = `${SERVER}/assets/tile_${i}.jpg`;
+      img.src = `${SERVER}/assets/tiles/tile_${i}.jpg`;
     }
   });
 }
