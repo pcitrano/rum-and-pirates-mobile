@@ -301,25 +301,25 @@ let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
 let lastTouchDist = 0;
 
 // ── Space type colours for overlay dots ──────────────────────────────────────
-const SPACE_COLORS = {
-  coin:        "#f4d03f",
-  start:       "#27ae60",
-  barrels:     "#8b4513",
-  recruit:     "#c0392b",
-  rendezvous:  "#8e44ad",
-  supply:      "#2980b9",
-  guard:       "#7f8c8d",
-  treasure:    "#d4ac0d",
-  red_map:     "#e74c3c",
-  green_map:   "#27ae60",
-  blue_pub:    "#2980b9",
-  green_pub:   "#27ae60",
-  red_pub:     "#e74c3c",
-  yellow_map:  "#f39c12",
-  dark_alley:  "#2c3e50",
-  normal:      null,
-  edge:        null,
-};
+// const SPACE_COLORS = {
+//  coin:        "#f4d03f",
+//  start:       "#27ae60",
+//  barrels:     "#8b4513",
+//  recruit:     "#c0392b",
+//  rendezvous:  "#8e44ad",
+//  supply:      "#2980b9",
+//  guard:       "#7f8c8d",
+//  treasure:    "#d4ac0d",
+//  red_map:     "#e74c3c",
+//  green_map:   "#27ae60",
+//  blue_pub:    "#2980b9",
+//  green_pub:   "#27ae60",
+//  red_pub:     "#e74c3c",
+//  yellow_map:  "#f39c12",
+//  dark_alley:  "#2c3e50",
+//  normal:      null,
+//  edge:        null,
+//};
 
 // ── Board generation (mirrors GameSetup.py) ───────────────────────────────────
 function rotateNormalized(x, y, rotation) {
@@ -478,7 +478,7 @@ function renderBoard() {
     // Captain piece
     if (id === captainPos) {
       ctx.beginPath();
-      ctx.arc(bx, by, 14, 0, Math.PI * 2);
+      ctx.arc(bx, by, 20, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.fill();
       ctx.strokeStyle = "#c9922a";
@@ -493,24 +493,24 @@ function renderBoard() {
     }
 
     // Legal move highlights
-    if (isMyTurn && legalDestIds.has(id)) {
-      ctx.beginPath();
-      ctx.arc(bx, by, 13, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(232,184,75,0.55)";
-      ctx.fill();
-      ctx.strokeStyle = "#e8b84b";
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-    }
+    //if (isMyTurn && legalDestIds.has(id)) {
+    //  ctx.beginPath();
+    //  ctx.arc(bx, by, 13, 0, Math.PI * 2);
+    //  ctx.fillStyle = "rgba(232,184,75,0.55)";
+    //  ctx.fill();
+    //  ctx.strokeStyle = "#e8b84b";
+    //  ctx.lineWidth = 2.5;
+    //  ctx.stroke();
+    //}
 
     // Coloured dot for special spaces
-    if (color && space.captain_space) {
-      ctx.beginPath();
-      ctx.arc(bx, by, 7, 0, Math.PI * 2);
-      ctx.fillStyle = color + "cc";
-      ctx.fill();
-    }
-  });
+    //if (color && space.captain_space) {
+    //  ctx.beginPath();
+    //  ctx.arc(bx, by, 7, 0, Math.PI * 2);
+    //  ctx.fillStyle = color + "cc";
+    //  ctx.fill();
+    //}
+  //});
 
   // Draw occupied paths — players don't have board positions, only occupied paths
   const occupiedPaths = gameState.occupied_paths || [];
@@ -523,7 +523,7 @@ function renderBoard() {
       const space = spaceLoookup[spaceId];
       if (!space) return;
       ctx.beginPath();
-      ctx.arc(space.board_x, space.board_y, 5, 0, Math.PI * 2);
+      ctx.arc(space.board_x, space.board_y, 10, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
     });
