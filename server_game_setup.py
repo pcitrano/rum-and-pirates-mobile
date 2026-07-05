@@ -20,15 +20,14 @@ class ServerGameSetup:
     def load_all_tiles(self):
         tiles = {}
         for tile_number in range(1, 10):
-            path = os.path.join(self.assets_dir, f"tile_{tile_number}.json")
+            path = os.path.join(self.tiles_dir, f"tile_{tile_number}.json")
             with open(path, "r") as f:
                 properties = json.load(f)
             tiles[tile_number] = properties
         return tiles
 
     def load_cards(self):
-        path = os.path.join(self.assets_dir, "cards.json")
-        with open(path, "r") as f:
+        with open(self.cards_path, "r") as f:
             return json.load(f)
 
     # ── Board creation ─────────────────────────────────────────────────────
