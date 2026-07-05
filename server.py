@@ -12,7 +12,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 rooms = {}  # { room_id: { "game_state": {}, "players": [] } }
 
 STATS_FILE = "/data/stats.json"
-board_setup = ServerGameSetup(assets_dir="assets/tiles")
+board_setup = ServerGameSetup(tiles_dir="assets/tiles", cards_path="assets/cards.json")
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 
