@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Rum & Pirates — Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0d1b2a; --parchment: #f2dfa7; --parch-dark: #e8c97a;
+    --wood: #6b3a1f; --wood-light: #8b5e3c; --gold: #c9922a;
+    --gold-light: #e8b84b; --ink: #1e1206; --red: #8b1a1a; --rope: #a07840;
+  }
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--navy);
+    font-family: 'Crimson Text', Georgia, serif;
+    color: var(--parchment);
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Top bar ── */
+  #topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(13,27,42,0.95);
+    border-bottom: 2px solid var(--wood);
+    padding: 6px 12px;
+    height: 44px;
+    z-index: 10;
+  }
+  #topbar .round-info {
+    font-family: 'Pirata One', cursive;
+    font-size: 1.1rem;
+    color: var(--gold-light);
+  }
+  #topbar .room-info {
+    font-size: 0.85rem;
+    color: var(--rope);
+    font-style: italic;
+  }
+  #menu-toggle {
+    background: none;
+    border: 1px solid var(--wood-light);
+    border-radius: 3px;
+    color: var(--parchment);
+    font-size: 1.1rem;
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+
+  /* ── Board area ── */
+  #board-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #board-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    image-rendering: crisp-edges;
+  }
+
+  /* ── Player status bar ── */
+  #status-bar {
+    flex-shrink: 0;
+    background: rgba(13,27,42,0.97);
+    border-top: 2px solid var(--wood);
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 130px;
+    overflow-y: auto;
+  }
+  .player-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    padding: 3px 6px;
+    border-radius: 3px;
+    transition: background 0.2s;
+  }
+  .player-row.active {
+    background: rgba(201,146,42,0.18);
+    border-left: 3px solid var(--gold);
+  }
+  .player-row.inactive { border-left: 3px solid transparent; }
+  .player-name { font-weight: 600; min-width: 70px; }
+  .player-pirates { color: var(--rope); font-size: 0.85rem; }
+  .player-barrels { color: #b0c4de; font-size: 0.85rem; }
+  .player-coins { color: var(--gold-light); font-size: 0.85rem; }
+  .active-crown { color: var(--gold-light); font-size: 0.9rem; }
+
+  /* ── Action panel (slide-up) ── */
+  #action-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #1a2e42;
+    border-top: 2px solid var(--wood);
+    border-radius: 12px 12px 0 0;
+    padding: 16px;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 20;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  #action-panel.open { transform: translateY(0); }
+  #action-panel h3 {
+    font-family: 'Pirata One', cursive;
+    color: var(--gold-light);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+  }
+  .action-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Pirata One', cursive;
+    font-size: 1.1rem;
+    cursor: pointer;
+    background: linear-gradient(160deg, var(--gold-light), var(--gold));
+    color: var(--ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .action-btn.secondary {
+    background: linear-gradient(160deg, var(--wood-light), var(--wood));
+    color: var(--parchment);
+  }
+  .action-btn:active { opacity: 0.85; }
+  #panel-close {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: none;
+    border: none;
+    color: var(--rope);
+    font-size: 1.4rem;
+    cursor: pointer;
+  }
+
+  /* ── Action log ── */
+  #log-panel {
+    position: fixed;
+    top: 44px; left: 0; right: 0; bottom: 0;
+    background: rgba(13,27,42,0.97);
+    z-index: 15;
+    display: none;
+    flex-direction: column;
+    padding: 12px;
+  }
+  #log-panel.open { display: flex; }
+  #log-panel h3 {
+    font-family: 'Pirata One', cursive;
+    color: var(--gold-light);
+    margin-bottom: 8px;
+  }
+  #log-list {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: var(--parchment);
+    line-height: 1.6;
+  }
+  #log-list p { border-bottom: 1px solid rgba(160,120,64,0.2); padding: 4px 0; }
+  #log-close {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--wood);
+    border: none;
+    border-radius: 4px;
+    color: var(--parchment);
+    font-family: 'Pirata One', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  /* ── Loading overlay ── */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--navy);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 16px;
+  }
+  #loading h2 { font-family: 'Pirata One', cursive; color: var(--gold-light); font-size: 1.8rem; }
+  #loading p { color: var(--rope); font-style: italic; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 4px solid rgba(160,120,64,0.3);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    top: 54px; left: 50%; transform: translateX(-50%);
+    background: rgba(107,58,31,0.95);
+    color: var(--parchment);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-style: italic;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 50;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h2>⚓ Rum &amp; Pirates</h2>
+  <div class="spinner"></div>
+  <p id="loading-msg">Connecting to server...</p>
+</div>
+
+<div id="app">
+  <!-- Top bar -->
+  <div id="topbar">
+    <div>
+      <div class="round-info" id="round-display">Round —</div>
+      <div class="room-info" id="room-display">Room: —</div>
+    </div>
+    <button id="menu-toggle" onclick="toggleActionPanel()">☰ Actions</button>
+  </div>
+
+  <!-- Board -->
+  <div id="board-wrapper">
+    <canvas id="board-canvas"></canvas>
+  </div>
+
+  <!-- Player status -->
+  <div id="status-bar" id="status-bar"></div>
+</div>
+
+<!-- Action panel -->
+<div id="action-panel">
+  <button id="panel-close" onclick="closeActionPanel()">✕</button>
+  <h3>Actions</h3>
+  <div id="action-buttons"></div>
+</div>
+
+<!-- Log panel -->
+<div id="log-panel">
+  <h3>📜 Action Log</h3>
+  <div id="log-list"></div>
+  <button id="log-close" onclick="toggleLog()">Close</button>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const SERVER = "https://rum-and-pirates-server-production.up.railway.app";
+const TILE_SIZE = 300; // matches GameSetup.py
+const MAX_CONNECTION_DISTANCE = 80;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let socket = null;
+let gameState = null;
+let myName = "";
+let myRoomId = null;
+let myPlayerIndex = null;
+let tileData = [];       // raw JSON for all 9 tiles
+let tileImages = [];     // loaded Image objects
+let boardSpaces = [];    // computed spaces with board_x, board_y
+let spaceLoookup = {};
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
+let lastTouchDist = 0;
+
+// ── Space type colours for overlay dots ──────────────────────────────────────
+const SPACE_COLORS = {
+  coin:        "#f4d03f",
+  start:       "#27ae60",
+  barrels:     "#8b4513",
+  recruit:     "#c0392b",
+  rendezvous:  "#8e44ad",
+  supply:      "#2980b9",
+  guard:       "#7f8c8d",
+  treasure:    "#d4ac0d",
+  red_map:     "#e74c3c",
+  green_map:   "#27ae60",
+  blue_pub:    "#2980b9",
+  green_pub:   "#27ae60",
+  red_pub:     "#e74c3c",
+  yellow_map:  "#f39c12",
+  dark_alley:  "#2c3e50",
+  normal:      null,
+  edge:        null,
+};
+
+// ── Board generation (mirrors GameSetup.py) ───────────────────────────────────
+function rotateNormalized(x, y, rotation) {
+  if (rotation === 0)   return [x, y];
+  if (rotation === 90)  return [1.0 - y, x];
+  if (rotation === 180) return [1.0 - x, 1.0 - y];
+  if (rotation === 270) return [y, 1.0 - x];
+}
+
+function buildBoardFromSeed(seed) {
+  const tileLookup = {};
+  tileData.forEach(t => { tileLookup[t.num_tile] = t; });
+
+  let allSpaces = [];
+  let nextId = 0;
+
+  // find max id across all tiles first
+  tileData.forEach(t => t.spaces.forEach(s => { if (s.id > nextId) nextId = s.id; }));
+  nextId += 1;
+
+  seed.forEach((entry, i) => {
+    const tile = tileLookup[entry.tile_num];
+    const rotation = entry.rotation;
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const offsetXt = col * TILE_SIZE;
+    const offsetYt = row * TILE_SIZE;
+
+    // deep copy spaces and rotate
+    tile.spaces.forEach(space => {
+      const [rx, ry] = rotateNormalized(space.x, space.y, rotation);
+      const boardX = Math.round(rx * TILE_SIZE) + offsetXt;
+      const boardY = Math.round(ry * TILE_SIZE) + offsetYt;
+      allSpaces.push({
+        ...JSON.parse(JSON.stringify(space)),
+        tile_num: tile.num_tile,
+        board_x: boardX,
+        board_y: boardY,
+        occupant: null,
+        captain: false,
+      });
+    });
+  });
+
+  // build lookup
+  let spaceLookup = {};
+  allSpaces.forEach(s => { spaceLookup[s.id] = s; });
+
+  // connect edge spaces
+  const edgeSpaces = allSpaces.filter(s => s.type === "edge");
+  const toRemove = new Set();
+  const newSpaces = [];
+
+  for (let a = 0; a < edgeSpaces.length; a++) {
+    for (let b = a + 1; b < edgeSpaces.length; b++) {
+      const sa = edgeSpaces[a], sb = edgeSpaces[b];
+      if (toRemove.has(sa.id) || toRemove.has(sb.id)) continue;
+      const dx = sa.board_x - sb.board_x;
+      const dy = sa.board_y - sb.board_y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < MAX_CONNECTION_DISTANCE) {
+        const midX = Math.round((sa.board_x + sb.board_x) / 2);
+        const midY = Math.round((sa.board_y + sb.board_y) / 2);
+        let neighborIds = [];
+        sa.neighbors.forEach(n => { if (n !== sb.id) neighborIds.push(n); });
+        sb.neighbors.forEach(n => { if (n !== sa.id) neighborIds.push(n); });
+        neighborIds = [...new Set(neighborIds)];
+        const newSpace = {
+          id: nextId++, type: "normal", tile_num: null,
+          board_x: midX, board_y: midY,
+          neighbors: neighborIds, occupant: null, captain: false
+        };
+        newSpaces.push({ newSpace, edgeA: sa, edgeB: sb });
+        toRemove.add(sa.id);
+        toRemove.add(sb.id);
+      }
+    }
+  }
+
+  // update neighbor references for merged spaces
+  newSpaces.forEach(({ newSpace, edgeA, edgeB }) => {
+    newSpace.neighbors.forEach(nid => {
+      const neighbor = spaceLookup[nid];
+      if (!neighbor) return;
+      neighbor.neighbors = neighbor.neighbors.map(x =>
+        (x === edgeA.id || x === edgeB.id) ? newSpace.id : x
+      );
+    });
+    allSpaces.push(newSpace);
+    spaceLookup[newSpace.id] = newSpace;
+  });
+
+  allSpaces = allSpaces.filter(s => !toRemove.has(s.id));
+  spaceLookup = {};
+  allSpaces.forEach(s => { spaceLookup[s.id] = s; });
+
+  // classify spaces
+  allSpaces.forEach(s => {
+    if (s.type === "edge" && s.neighbors.length === 1) s.type = "dark_alley";
+    const isNormal = s.type === "normal" || s.type === "edge";
+    const isDark = s.type === "dark_alley";
+    s.captain_space = !isNormal && !isDark;
+    s.clickable = !isNormal && !isDark;
+    s.required_pirates = (isNormal || isDark) ? 1 : 0;
+    s.hitbox_radius = s.clickable ? (s.type === "edge" ? 0.04 * TILE_SIZE : 0.07 * TILE_SIZE) : 0;
+  });
+
+  return { allSpaces, spaceLookup };
+}
+
+// ── Canvas rendering ──────────────────────────────────────────────────────────
+const canvas = document.getElementById("board-canvas");
+const ctx = canvas.getContext("2d");
+const wrapper = document.getElementById("board-wrapper");
+
+function resizeCanvas() {
+  canvas.width = wrapper.clientWidth;
+  canvas.height = wrapper.clientHeight;
+  renderBoard();
+}
+
+function renderBoard() {
+  if (!gameState || tileImages.length < 9) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  const seed = gameState.board_seed;
+  if (!seed) { ctx.restore(); return; }
+
+  // Draw each tile image
+  seed.forEach((entry, i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    const ox = col * TILE_SIZE, oy = row * TILE_SIZE;
+    const img = tileImages[entry.tile_num - 1];
+    if (!img) return;
+
+    ctx.save();
+    ctx.translate(ox + TILE_SIZE / 2, oy + TILE_SIZE / 2);
+    ctx.rotate((entry.rotation * Math.PI) / 180);
+    ctx.drawImage(img, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+    ctx.restore();
+  });
+
+  // Draw space overlays
+  const captainPos = gameState.captain_space;
+  const legalMoves = gameState.legal_moves || [];
+  const legalDestIds = new Set(legalMoves.map(m => m.destination));
+  const isMyTurn = gameState.active_player === myPlayerIndex;
+
+  boardSpaces.forEach(space => {
+    const { board_x: bx, board_y: by, type, id } = space;
+    const color = SPACE_COLORS[type];
+
+    // Captain piece
+    if (id === captainPos) {
+      ctx.beginPath();
+      ctx.arc(bx, by, 14, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fill();
+      ctx.strokeStyle = "#c9922a";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = "#1e1206";
+      ctx.font = "bold 14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("⚓", bx, by);
+      return;
+    }
+
+    // Legal move highlights
+    if (isMyTurn && legalDestIds.has(id)) {
+      ctx.beginPath();
+      ctx.arc(bx, by, 13, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(232,184,75,0.55)";
+      ctx.fill();
+      ctx.strokeStyle = "#e8b84b";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // Coloured dot for special spaces
+    if (color && space.captain_space) {
+      ctx.beginPath();
+      ctx.arc(bx, by, 7, 0, Math.PI * 2);
+      ctx.fillStyle = color + "cc";
+      ctx.fill();
+    }
+  });
+
+  // Draw occupied paths — players don't have board positions, only occupied paths
+  const occupiedPaths = gameState.occupied_paths || [];
+  occupiedPaths.forEach(path => {
+    const player = gameState.players.find(p => p.id === path.player_id);
+    if (!player) return;
+    const c = player.color;
+    const color = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || "#fff");
+    (path.path || []).forEach(spaceId => {
+      const space = spaceLoookup[spaceId];
+      if (!space) return;
+      ctx.beginPath();
+      ctx.arc(space.board_x, space.board_y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  });
+
+  ctx.restore();
+}
+
+// ── Touch / pan / zoom ────────────────────────────────────────────────────────
+function initBoardSize() {
+  const boardPx = TILE_SIZE * 3;
+  const ww = wrapper.clientWidth, wh = wrapper.clientHeight;
+  scale = Math.min(ww, wh) / boardPx * 0.97;
+  offsetX = (ww - boardPx * scale) / 2;
+  offsetY = (wh - boardPx * scale) / 2;
+}
+
+canvas.addEventListener("pointerdown", e => {
+  isPanning = true;
+  panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!isPanning) return;
+  offsetX = panStart.ox + (e.clientX - panStart.x);
+  offsetY = panStart.oy + (e.clientY - panStart.y);
+  renderBoard();
+});
+canvas.addEventListener("pointerup", e => {
+  const dx = Math.abs(e.clientX - panStart.x);
+  const dy = Math.abs(e.clientY - panStart.y);
+  if (dx < 8 && dy < 8) handleBoardTap(e.clientX, e.clientY);
+  isPanning = false;
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  offsetX = mx - (mx - offsetX) * factor;
+  offsetY = my - (my - offsetY) * factor;
+  scale *= factor;
+  renderBoard();
+}, { passive: false });
+
+// Pinch zoom
+let activeTouches = {};
+canvas.addEventListener("touchstart", e => {
+  [...e.changedTouches].forEach(t => activeTouches[t.identifier] = t);
+}, { passive: true });
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  [...e.changedTouches].forEach(t => activeTouches[t.identifier] = t);
+  const pts = Object.values(activeTouches);
+  if (pts.length === 2) {
+    const dx = pts[0].clientX - pts[1].clientX;
+    const dy = pts[0].clientY - pts[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (lastTouchDist > 0) {
+      const factor = dist / lastTouchDist;
+      const mx = (pts[0].clientX + pts[1].clientX) / 2;
+      const my = (pts[0].clientY + pts[1].clientY) / 2;
+      const rect = canvas.getBoundingClientRect();
+      const lx = mx - rect.left, ly = my - rect.top;
+      offsetX = lx - (lx - offsetX) * factor;
+      offsetY = ly - (ly - offsetY) * factor;
+      scale *= factor;
+      renderBoard();
+    }
+    lastTouchDist = dist;
+  }
+}, { passive: false });
+canvas.addEventListener("touchend", e => {
+  [...e.changedTouches].forEach(t => delete activeTouches[t.identifier]);
+  if (Object.keys(activeTouches).length < 2) lastTouchDist = 0;
+}, { passive: true });
+
+// ── Board tap handling ────────────────────────────────────────────────────────
+function handleBoardTap(clientX, clientY) {
+  if (!gameState || gameState.active_player !== myPlayerIndex) return;
+  if (gameState.phase !== "start_turn" && gameState.phase !== "choose_action") return;
+
+  const rect = canvas.getBoundingClientRect();
+  const bx = (clientX - rect.left - offsetX) / scale;
+  const by = (clientY - rect.top - offsetY) / scale;
+
+  const legalMoves = gameState.legal_moves || [];
+
+  for (const move of legalMoves) {
+    const boardSpace = spaceLoookup[move.destination];
+    if (!boardSpace || !boardSpace.hitbox_radius) continue;
+    const dx = bx - boardSpace.board_x, dy = by - boardSpace.board_y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < boardSpace.hitbox_radius) {
+      promptMove(move);
+      return;
+    }
+  }
+}
+
+function promptMove(move) {
+  const container = document.getElementById("action-buttons");
+  container.innerHTML = `
+    <p style="color:var(--parchment);margin-bottom:12px;">
+      Move to <strong style="color:var(--gold-light)">${move.destination_type.replace(/_/g,' ')}</strong>
+      for <strong style="color:var(--gold-light)">${move.cost} pirate${move.cost !== 1 ? 's' : ''}</strong>?
+    </p>
+  `;
+  const confirmBtn = document.createElement("button");
+  confirmBtn.className = "action-btn";
+  confirmBtn.textContent = "✓ Confirm Move";
+  confirmBtn.onclick = () => {
+    socket.emit("player_action", {
+      room_id: myRoomId,
+      type: "move",
+      destination_id: move.destination,
+      player_index: myPlayerIndex
+    });
+    closeActionPanel();
+  };
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "action-btn secondary";
+  cancelBtn.textContent = "✕ Cancel";
+  cancelBtn.onclick = closeActionPanel;
+  container.appendChild(confirmBtn);
+  container.appendChild(cancelBtn);
+  document.getElementById("action-panel").classList.add("open");
+}
+
+// ── UI updates ────────────────────────────────────────────────────────────────
+function updateUI() {
+  if (!gameState) return;
+
+  if (gameState.phase === "character_select") {
+    document.getElementById("board-wrapper").style.display = "none";
+    document.getElementById("status-bar").style.display = "none";
+    renderCharacterSelect();
+    return;
+  } else {
+    document.getElementById("board-wrapper").style.display = "";
+    document.getElementById("status-bar").style.display = "";
+    const overlay = document.getElementById("character-select-overlay");
+    if (overlay) overlay.remove();
+  }
+
+  document.getElementById("round-display").textContent = `Round ${gameState.round || "—"} of 5`;
+  document.getElementById("room-display").textContent = `Room: ${myRoomId || "—"}`;
+
+  // Status bar
+  const bar = document.getElementById("status-bar");
+  bar.innerHTML = "";
+  (gameState.players || []).forEach((player, i) => {
+    const isActive = i === gameState.active_player;
+    const total = 15 - (player.pirate_reserve || 0);
+    const div = document.createElement("div");
+    div.className = `player-row ${isActive ? "active" : "inactive"}`;
+    const c = player.color;
+    const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
+    div.innerHTML = `
+      ${isActive ? '<span class="active-crown">⚓</span>' : '<span style="width:14px;display:inline-block"></span>'}
+      <span class="player-name" style="color:${colorCss}">${player.name}</span>
+      <span class="player-pirates">🏴 ${player.pirates || 0}/${total}</span>
+      <span class="player-barrels">🛢 ${player.barrels || 0}</span>
+      <span class="player-coins">🪙 ${player.coins || 0}</span>
+    `;
+    bar.appendChild(div);
+  });
+
+  // Action log
+  const logList = document.getElementById("log-list");
+  logList.innerHTML = (gameState.action_log || []).slice().reverse()
+    .map(e => `<p>${e}</p>`).join("");
+
+  renderBoard();
+}
+
+// ── Character select screen ────────────────────────────────────────────────
+function renderCharacterSelect() {
+  let overlay = document.getElementById("character-select-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "character-select-overlay";
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:#1e1206;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; z-index:60; padding:20px; gap:16px;
+      overflow-y:auto;
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  const hands = gameState.character_hands || [];
+  const selections = gameState.character_selections || [];
+  const confirmed = gameState.character_confirmed || [];
+  const myHand = hands[myPlayerIndex] || [];
+  const mySelection = selections[myPlayerIndex];
+  const alreadyConfirmed = confirmed[myPlayerIndex];
+
+  const confirmedCount = confirmed.filter(Boolean).length;
+  const total = (gameState.players || []).length;
+
+  overlay.innerHTML = `
+    <h2 style="font-family:'Pirata One',cursive;color:#e8b84b;font-size:1.6rem;text-align:center;">
+      Choose Your Captain
+    </h2>
+    <p style="color:#c9922a;font-style:italic;">
+      ${alreadyConfirmed ? `${confirmedCount}/${total} captains ready` : "Select your captain and confirm"}
+    </p>
+    <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+      ${myHand.map(c => `
+        <div class="char-card" data-name="${c.name}" style="
+          width:150px; border:3px solid ${mySelection === c.name ? '#e8b84b' : '#6b3a1f'};
+          border-radius:8px; padding:8px; cursor:${alreadyConfirmed ? 'default' : 'pointer'};
+          opacity:${alreadyConfirmed && mySelection !== c.name ? '0.4' : '1'};
+          background:#2a1810;
+        ">
+          <img src="${SERVER}/assets/${c.image}" style="width:100%;border-radius:4px;" onerror="this.style.display='none'">
+          <p style="color:#f2dfa7;text-align:center;font-size:0.85rem;margin-top:6px;">${c.name}</p>
+        </div>
+      `).join("")}
+    </div>
+    ${!alreadyConfirmed ? `
+      <button id="confirm-char-btn" class="action-btn" style="max-width:220px;" ${mySelection ? '' : 'disabled'}>
+        Confirm
+      </button>
+    ` : `<p style="color:#c9922a;font-style:italic;">Waiting for other players...</p>`}
+  `;
+
+  if (!alreadyConfirmed) {
+    overlay.querySelectorAll(".char-card").forEach(card => {
+      card.onclick = () => {
+        gameState.character_selections[myPlayerIndex] = card.dataset.name;
+        renderCharacterSelect();
+      };
+    });
+    const confirmBtn = document.getElementById("confirm-char-btn");
+    if (confirmBtn) {
+      confirmBtn.disabled = !mySelection;
+      confirmBtn.onclick = () => {
+        socket.emit("confirm_character", {
+          room_id: myRoomId,
+          player_index: myPlayerIndex,
+          selected_name: mySelection,
+          random_start: localStorage.getItem("rapRandomStart") === "true"
+        });
+      };
+    }
+  }
+}
+
+function buildActionButtons() {
+  const container = document.getElementById("action-buttons");
+  container.innerHTML = "";
+  if (!gameState || gameState.phase === "character_select") return;
+  if (gameState.active_player !== myPlayerIndex) {
+    container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
+    return;
+  }
+  const phase = gameState.phase;
+
+  if (phase === "start_turn" || phase === "choose_action") {
+    addActionBtn(container, "Go On Board", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "go_on_board", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    addActionBtn(container, "Rest", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "rest", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+  }
+}
+
+function addActionBtn(container, label, cls, fn) {
+  const btn = document.createElement("button");
+  btn.className = `action-btn ${cls}`;
+  btn.textContent = label;
+  btn.onclick = fn;
+  container.appendChild(btn);
+}
+
+// ── Panels ────────────────────────────────────────────────────────────────────
+function toggleActionPanel() {
+  buildActionButtons();
+  document.getElementById("action-panel").classList.toggle("open");
+}
+function closeActionPanel() {
+  document.getElementById("action-panel").classList.remove("open");
+}
+function toggleLog() {
+  document.getElementById("log-panel").classList.toggle("open");
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), duration);
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+function setLoading(msg) {
+  document.getElementById("loading-msg").textContent = msg;
+}
+function hideLoading() {
+  document.getElementById("loading").style.display = "none";
+}
+
+// ── Asset loading ─────────────────────────────────────────────────────────────
+async function loadTileData() {
+  setLoading("Loading tile data...");
+  const res = await fetch(`${SERVER}/assets/tiles`);
+  tileData = await res.json();
+}
+
+function loadTileImages() {
+  return new Promise((resolve) => {
+    setLoading("Loading tile images...");
+    tileImages = new Array(9).fill(null);
+    let loaded = 0;
+    for (let i = 1; i <= 9; i++) {
+      const img = new Image();
+      img.onload = () => {
+        tileImages[i - 1] = img;
+        loaded++;
+        setLoading(`Loading tiles... ${loaded}/9`);
+        if (loaded === 9) resolve();
+      };
+      img.onerror = () => { loaded++; if (loaded === 9) resolve(); };
+      img.src = `${SERVER}/assets/tile_${i}.jpg`;
+    }
+  });
+}
+
+// ── Socket connection ─────────────────────────────────────────────────────────
+function connectToGame(name, roomId, playerIndex) {
+  myName = name;
+  myRoomId = roomId;
+  myPlayerIndex = playerIndex;
+
+  setLoading("Connecting to game...");
+  socket = io(SERVER, { transports: ["websocket"] });
+
+  socket.on("connect", () => {
+    setLoading("Joining room...");
+    socket.emit("join_room", { room_id: roomId, name });
+  });
+
+  socket.on("room_joined", (data) => {
+    myPlayerIndex = data.player_index;
+    setLoading("Waiting for game state...");
+  });
+
+  socket.on("state_updated", (data) => {
+    gameState = data.game_state;
+
+    // Always resolve player index by name — seat order can shuffle server-side
+    if (gameState.players && myName) {
+      const idx = gameState.players.findIndex(p => p.name === myName);
+      if (idx !== -1) myPlayerIndex = idx;
+    }
+
+    // JSON converts integer dict keys to strings — convert back
+    if (gameState.space_lookup) {
+      const fixed = {};
+      Object.entries(gameState.space_lookup).forEach(([k, v]) => { fixed[parseInt(k)] = v; });
+      gameState.space_lookup = fixed;
+    }
+    if (gameState.captain_graph) {
+      const fixed = {};
+      Object.entries(gameState.captain_graph).forEach(([k, v]) => { fixed[parseInt(k)] = v; });
+      gameState.captain_graph = fixed;
+    }
+
+    if (gameState && gameState.board_seed && boardSpaces.length === 0) {
+      setLoading("Building board...");
+      const { allSpaces, spaceLookup } = buildBoardFromSeed(gameState.board_seed);
+      boardSpaces = allSpaces;
+      spaceLoookup = spaceLookup;
+      initBoardSize();
+      resizeCanvas();
+    }
+    updateUI();
+    buildActionButtons();
+    hideLoading();
+  });
+
+  socket.on("game_state_update", (gs) => {
+    gameState = gs;
+    updateUI();
+    hideLoading();
+  });
+
+  socket.on("action_received", (data) => {
+    showToast(`${data.type} action received`);
+  });
+
+  socket.on("disconnect", () => {
+    showToast("Disconnected from server", 5000);
+  });
+
+  socket.on("connect_error", () => {
+    setLoading("Connection failed. Retrying...");
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener("resize", resizeCanvas);
+
+(async () => {
+  // Read params from URL: game.html?name=Jeff&room=ABC123&index=0
+  const params = new URLSearchParams(window.location.search);
+  const name  = params.get("name")  || localStorage.getItem("rapName")  || "";
+  const room  = params.get("room")  || localStorage.getItem("rapRoom")  || "";
+  const index = parseInt(params.get("index") || localStorage.getItem("rapIndex") || "0");
+
+  if (!name || !room) {
+    setLoading("Missing name or room. Please join from the lobby.");
+    return;
+  }
+
+  await loadTileData();
+  await loadTileImages();
+  connectToGame(name, room, index);
+})();
+</script>
+</body>
+</html>
