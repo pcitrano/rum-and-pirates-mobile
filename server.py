@@ -106,6 +106,10 @@ def on_update_state(data):
 
 @socketio.on("start_game")
 def on_start_game(data):
+    """
+    Legacy path — desktop client still builds and sends its own game_state.
+    Kept for backward compatibility while the migration is in progress.
+    """
     room_id = data["room_id"]
     game_state = data["game_state"]
     rooms[room_id]["game_state"] = game_state
@@ -114,18 +118,51 @@ def on_start_game(data):
 @socketio.on("new_game")
 def on_new_game(data):
     """
-    Phase 1 of server-side migration: the server generates the board
-    (spaces, captain_graph, alley_lookup, coin_lookup) instead of the
-    desktop host. Everything else in game_state still comes from the
-    client for now — this only replaces board generation.
+    Fully server-driven game start. The server builds the entire initial
+    game_state — players, characters (if enabled), decks, tableau, and
+    board — using only the connected players' names from the room.
     """
     room_id = data["room_id"]
     if room_id not in rooms:
         emit("error", {"message": "Room not found"})
         return
 
-    game_state = data.get("game_state", {})
-    game_state = board_setup.generate_board(game_state)
+    play_with_characters = data.get("play_with_characters", False)
+    random_start = data.get("random_start", False)
+
+    player_names = [p["name"] for p in rooms[room_id]["players"]]
+
+    game_state = board_setup.new_game_state(
+        player_names,
+        play_with_characters=play_with_characters,
+        random_start=random_start
+    )
+
+    rooms[room_id]["game_state"] = game_state
+    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+
+@socketio.on("confirm_character")
+def on_confirm_character(data):
+    """
+    A player confirms their character pick. Once all players have
+    confirmed, the server assigns characters, applies bonuses, generates
+    the board, and starts the game.
+    """
+    room_id = data["room_id"]
+    player_index = data["player_index"]
+    selected_name = data["selected_name"]
+    random_start = data.get("random_start", False)
+
+    if room_id not in rooms or rooms[room_id]["game_state"] is None:
+        emit("error", {"message": "Room not found or game not started"})
+        return
+
+    game_state = rooms[room_id]["game_state"]
+    game_state["character_selections"][player_index] = selected_name
+    game_state["character_confirmed"][player_index] = True
+
+    if all(game_state["character_confirmed"]):
+        game_state = board_setup.finish_character_select(game_state, random_start=random_start)
 
     rooms[room_id]["game_state"] = game_state
     socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
