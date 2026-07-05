@@ -30,6 +30,12 @@ def get_tile_data():
                 tile_data.append(json.load(f))
     return Response(json.dumps(tile_data), mimetype="application/json")
 
+# ── Main Lobby ─────────────────────────────────────────────────────────────────────
+@app.route("/")
+def lobby():
+    with open("lobby.html") as f:
+        return f.read()
+
 # ── Rooms ─────────────────────────────────────────────────────────────────────
 
 @app.route("/rooms")
