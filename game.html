@@ -473,7 +473,7 @@ function renderBoard() {
 
   boardSpaces.forEach(space => {
     const { board_x: bx, board_y: by, type, id } = space;
-    const color = SPACE_COLORS[type];
+    //const color = SPACE_COLORS[type];
 
     // Captain piece
     if (id === captainPos) {
@@ -741,7 +741,7 @@ function renderCharacterSelect() {
           opacity:${alreadyConfirmed && mySelection !== c.name ? '0.4' : '1'};
           background:#2a1810;
         ">
-          <img src="${SERVER}/assets/${c.image}" style="width:100%;border-radius:4px;" onerror="this.style.display='none'">
+          <img src="${SERVER}/assets/characters/${c.image}" style="width:100%;border-radius:4px;" onerror="this.style.display='none'">
           <p style="color:#f2dfa7;text-align:center;font-size:0.85rem;margin-top:6px;">${c.name}</p>
         </div>
       `).join("")}
