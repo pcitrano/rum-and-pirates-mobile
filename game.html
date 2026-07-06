@@ -390,7 +390,7 @@ function buildBoardFromSeed(seed) {
   allSpaces.forEach(s => { spaceLookup[s.id] = s; });
 
   // connect edge spaces
-  const edgeSpaces = allSpaces.filter(s => s.type === "edge");
+  const edgeSpaces = allSpaces.filter(s => s.type === "edge").sort((a, b) => a.id - b.id);
   const toRemove = new Set();
   const newSpaces = [];
 
@@ -419,6 +419,8 @@ function buildBoardFromSeed(seed) {
       }
     }
   }
+
+
 
   // update neighbor references for merged spaces
   newSpaces.forEach(({ newSpace, edgeA, edgeB }) => {
@@ -498,7 +500,7 @@ function renderBoard() {
     // Captain piece
     if (id === captainPos) {
       ctx.beginPath();
-      ctx.arc(bx, by, 14, 0, Math.PI * 2);
+      ctx.arc(bx, by, 20, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.fill();
       ctx.strokeStyle = "#c9922a";
@@ -929,7 +931,7 @@ function loadTileImages() {
         if (loaded === 9) resolve();
       };
       img.onerror = () => { loaded++; if (loaded === 9) resolve(); };
-      img.src = `${SERVER}/assets/tile_${i}.jpg`;
+      img.src = `${SERVER}/assets/tiles/tile_${i}.jpg`;
     }
   });
 }

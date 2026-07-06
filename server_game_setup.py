@@ -88,16 +88,18 @@ class ServerGameSetup:
 
         space_lookup = {space["id"]: space for space in all_spaces}
 
-        # ── Connect adjacent tile edges ──
-        edge_spaces = [s for s in all_spaces if s["type"] == "edge"]
+        edge_spaces = sorted(
+            [s for s in all_spaces if s["type"] == "edge"],
+            key=lambda s: s["id"]
+        )
         spaces_to_remove = set()
         new_spaces = []
         next_space_id = max(space["id"] for space in all_spaces) + 1
 
-        for space_a in edge_spaces:
-            for space_b in edge_spaces:
-                if space_a["id"] >= space_b["id"]:
-                    continue
+        for i in range(len(edge_spaces)):
+            for j in range(i + 1, len(edge_spaces)):
+                space_a = edge_spaces[i]
+                space_b = edge_spaces[j]
                 if space_a["id"] in spaces_to_remove or space_b["id"] in spaces_to_remove:
                     continue
 
@@ -454,11 +456,6 @@ class ServerGameSetup:
         game_state["legal_moves"] = game_state["captain_graph"][new_start]
 
     def finish_character_select(self, game_state, random_start=False):
-        """
-        Called once all players have confirmed a character. Assigns
-        characters, applies any start-of-game character bonuses, generates
-        the board, and moves the game into start_turn.
-        """
         hands = game_state.get("character_hands", [])
         selections = game_state.get("character_selections", [])
 
