@@ -986,11 +986,16 @@ function connectToGame(name, roomId, playerIndex) {
       const { allSpaces, spaceLookup } = buildBoardFromSeed(gameState.board_seed);
       boardSpaces = allSpaces;
       spaceLoookup = spaceLookup;
-      initBoardSize();
-      resizeCanvas();
+      needsBoardSizing = true;
     }
     updateUI();
     buildActionButtons();
+    if (needsBoardSizing) {
+      requestAnimationFrame(() => {
+        initBoardSize();
+        resizeCanvas();
+      });
+    }
     hideLoading();
   });
 
