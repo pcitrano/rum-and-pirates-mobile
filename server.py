@@ -26,7 +26,7 @@ def assets(filename):
 def get_tile_data():
     tile_data = []
     for i in range(1, 10):
-        path = f"assets/tile_{i}.json"
+        path = f"assets/tiles/tile_{i}.json"
         if os.path.exists(path):
             with open(path) as f:
                 tile_data.append(json.load(f))

@@ -82,6 +82,34 @@
     image-rendering: crisp-edges;
   }
 
+  /* ── Scorpion / roll contest overlay ── */
+  #contest-overlay {
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(13,27,42,0.92);
+    border: 2px solid var(--gold);
+    border-radius: 8px;
+    padding: 8px 16px;
+    z-index: 15;
+    text-align: center;
+    display: none;
+    white-space: nowrap;
+  }
+  #contest-overlay .contest-turn {
+    font-family: 'Pirata One', cursive;
+    color: var(--gold-light);
+    font-size: 1rem;
+  }
+  #contest-overlay .contest-progress {
+    color: var(--parchment);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  #contest-overlay .contest-progress strong {
+    color: var(--gold-light);
+  }
+
   /* ── Tableau side panel ── */
   #tableau-panel {
     flex-shrink: 0;
@@ -712,6 +740,30 @@ function renderTableau() {
   `).join("");
 }
 
+// ── Scorpion / roll contest overlay ────────────────────────────────────────────
+function renderContestOverlay() {
+  const overlay = document.getElementById("contest-overlay");
+  const contest = gameState.scorpion_contest;
+  const rollPhases = ["roll_start", "roll_no_barrels", "roll_with_barrels", "roll_with_rerolls"];
+
+  if (!contest || !contest.contest_active || !rollPhases.includes(gameState.phase)) {
+    overlay.style.display = "none";
+    return;
+  }
+
+  const rollerIndex = gameState.phase === "roll_start"
+    ? gameState.next_roller
+    : (gameState.current_roll || {}).player;
+  const roller = gameState.players[rollerIndex];
+  const rollerName = roller ? roller.name : "Someone";
+
+  document.getElementById("contest-turn-label").textContent = `🦂 ${rollerName}'s roll`;
+  document.getElementById("contest-progress-label").innerHTML =
+    `<strong>${contest.total}</strong> / ${contest.target} to get stung`;
+
+  overlay.style.display = "block";
+}
+
 // ── UI updates ────────────────────────────────────────────────────────────────
 function updateUI() {
   if (!gameState) return;
@@ -732,6 +784,7 @@ function updateUI() {
   document.getElementById("room-display").textContent = `Room: ${myRoomId || "—"}`;
 
   renderTableau();
+  renderContestOverlay();
 
   // Status bar
   const bar = document.getElementById("status-bar");
