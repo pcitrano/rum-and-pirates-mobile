@@ -1,19 +1,3 @@
-"""
-server_gameplay.py
-
-Server-side port of gameplay.py, covering:
-  - Captain movement (move_captain / confirm_move / cancel_move)
-  - Legal move refresh + teleport-on-stuck logic
-  - Simple space resolutions: barrels, coin, recruit
-  - Core turn flow needed so a move doesn't dead-end: rest, go_on_board,
-    avast_turn, move_again
-
-Everything else (pubs, guards, maps, supply, rendezvous cards, treasure,
-scorpions, wrangle) is NOT yet migrated — resolve_space only dispatches to
-the three simple space types for now. Any other space type just logs and
-moves to post_move so the turn can still complete without crashing.
-"""
-
 import random
 
 class ServerGameplay:
@@ -298,6 +282,9 @@ class ServerGameplay:
         elif space["type"] == "recruit":
             self.log_action(game_state, f"{player['name']} added an ally to their cause.")
             return self.recruit_space(game_state, player)
+        elif space["type"] == "treasure":
+            return self.treasure_space(game_state)
+
         else:
             # Not yet migrated (pubs, maps, guards, supply, rendezvous,
             # treasure, scorpion, start/reclaim). Log it and let the turn
@@ -323,7 +310,107 @@ class ServerGameplay:
             return
         player["pirates"] += 1
         player["pirate_reserve"] -= 1
+        self.log_action(game_state, f"{player['name']} added an ally to their cause.")
         game_state["phase"] = "post_move"
+
+    def treasure_space(self, game_state):
+        player = game_state["players"][game_state["active_player"]]
+        card = game_state["tableau"]["treasure"]
+ 
+        player["treasure"].append(card)
+        game_state["tableau"]["treasure"] = game_state["decks"]["treasure"].pop()
+        self.log_action(game_state, f"{player['name']} found buried treasure.")
+        self.score_players(game_state)
+ 
+        return self.start_scorpion(game_state)
+ 
+    def start_scorpion(self, game_state):
+        scorpion = game_state["tableau"]["scorpion"]
+        game_state["scorpion_contest"] = {
+            "target": int(scorpion["dice_roll"]),
+            "total": 0,
+            "player_index": game_state["active_player"],
+            "contest_active": True
+        }
+        return self.roll_start(game_state, game_state["active_player"])
+
+    def resolve_scorpion(self, game_state):
+        player_id = game_state["current_roll"]["player"]
+        player = game_state["players"][player_id]
+        roll_value = game_state["current_roll"]["roll"]
+        player["free_rerolls"] = 0
+ 
+        card = game_state["tableau"]["scorpion"]
+        game_state["scorpion_contest"]["total"] += roll_value
+ 
+        if game_state["scorpion_contest"]["total"] >= game_state["scorpion_contest"]["target"]:
+            player["scorpions"].append(card)
+            self.log_action(game_state, f"Ouch! {player['name']} got stung!")
+            game_state["scorpion_contest"]["contest_active"] = False
+            game_state["tableau"]["scorpion"] = game_state["decks"]["scorpions"].pop()
+            game_state["phase"] = "post_move"
+            self.score_players(game_state)
+        else:
+            next_player = (player_id + 1) % len(game_state["players"])
+            game_state["scorpion_contest"]["player_index"] = next_player
+            self.roll_start(game_state, next_player)
+
+    # ── Dice Rolling ────────────────────────────────────────────────────────
+    def roll_start(self, game_state, player_index):
+        game_state["next_roller"] = player_index
+        game_state["phase"] = "roll_start"
+ 
+    def roll_die(self):
+        return random.randint(1, 6)
+ 
+    def roll(self, game_state, player_index):
+        roll_value = self.roll_die()
+        player = game_state["players"][player_index]
+        game_state["current_roll"] = {
+            "player": player_index,
+            "roll": roll_value,
+            "image": f"die_{roll_value}.png"
+        }
+ 
+        if player["free_rerolls"] > 0:
+            game_state["phase"] = "roll_with_rerolls"
+        elif player["barrels"] > 0:
+            game_state["phase"] = "roll_with_barrels"
+        else:
+            game_state["phase"] = "roll_no_barrels"
+ 
+    def resolve_reroll(self, game_state):
+        player_id = game_state["current_roll"]["player"]
+        player = game_state["players"][player_id]
+ 
+        if game_state["phase"] == "roll_with_barrels":
+            player["barrels"] -= 1
+            player["free_rerolls"] += 1
+            self.log_action(game_state, f"{player['name']} used a barrel to roll again.")
+            self.roll_start(game_state, player_id)
+        elif game_state["phase"] == "roll_with_rerolls":
+            player["free_rerolls"] -= 1
+            self.roll_start(game_state, player_id)
+ 
+    def resolve_roll(self, game_state):
+        """
+        Accepts the current roll and dispatches based on what triggered it.
+        Only the treasure/scorpion contest is migrated so far — wrangle and
+        Fergus's guard roll are left alone (not yet server-side), and any
+        other roll type just falls through safely.
+        """
+        captain_space = game_state["captain_space"]
+        space_type = game_state["space_lookup"][captain_space]["type"]
+        player_id = game_state["current_roll"]["player"]
+        game_state["players"][player_id]["free_rerolls"] = 0
+ 
+        if game_state.get("wrangle", {}).get("active"):
+            return  # not yet migrated
+        if game_state.get("fergus_guard_roll") is not None:
+            return  # not yet migrated
+        if space_type == "treasure":
+            return self.resolve_scorpion(game_state)
+        # pubs and other roll types aren't migrated yet
 
     # ── Turn flow ────────────────────────────────────────────────────────
 

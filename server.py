@@ -26,7 +26,7 @@ def assets(filename):
 def get_tile_data():
     tile_data = []
     for i in range(1, 10):
-        path = f"assets/tiles/tile_{i}.json"
+        path = f"assets/tile_{i}.json"
         if os.path.exists(path):
             with open(path) as f:
                 tile_data.append(json.load(f))
@@ -155,6 +155,19 @@ def on_player_action(data):
 
     elif action_type == "avast":
         gameplay.avast_turn(game_state)
+
+    elif action_type == "roll":
+        roller_index = data.get("player_index")
+        if game_state.get("next_roller") != roller_index:
+            emit("error", {"message": "It's not your turn to roll"})
+            return
+        gameplay.roll(game_state, roller_index)
+
+    elif action_type == "confirm_roll":
+        gameplay.resolve_roll(game_state)
+
+    elif action_type == "reroll":
+        gameplay.resolve_reroll(game_state)
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)

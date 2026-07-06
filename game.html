@@ -389,7 +389,6 @@ function buildBoardFromSeed(seed) {
   let spaceLookup = {};
   allSpaces.forEach(s => { spaceLookup[s.id] = s; });
 
-  // connect edge spaces
   const edgeSpaces = allSpaces.filter(s => s.type === "edge").sort((a, b) => a.id - b.id);
   const toRemove = new Set();
   const newSpaces = [];
@@ -419,8 +418,6 @@ function buildBoardFromSeed(seed) {
       }
     }
   }
-
-
 
   // update neighbor references for merged spaces
   newSpaces.forEach(({ newSpace, edgeA, edgeB }) => {
@@ -842,11 +839,38 @@ function buildActionButtons() {
   const container = document.getElementById("action-buttons");
   container.innerHTML = "";
   if (!gameState || gameState.phase === "character_select") return;
+  const phase = gameState.phase;
+
+  // Roll phases can apply to a player other than active_player (e.g. a
+  // scorpion contest passes the roll around the table).
+  if (phase === "roll_start") {
+    if (gameState.next_roller === myPlayerIndex) {
+      addActionBtn(container, "🎲 Roll the Die", "", () => {
+        socket.emit("player_action", { room_id: myRoomId, type: "roll", player_index: myPlayerIndex });
+      });
+    } else {
+      const rollerName = (gameState.players[gameState.next_roller] || {}).name || "Someone";
+      container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for ${rollerName} to roll...</p>`;
+    }
+    return;
+  }
+
+  if (phase === "roll_no_barrels" || phase === "roll_with_barrels" || phase === "roll_with_rerolls") {
+    const rollerIndex = gameState.current_roll ? gameState.current_roll.player : null;
+    if (rollerIndex === myPlayerIndex) {
+      showRollResult(container);
+    } else {
+      const rollerName = (gameState.players[rollerIndex] || {}).name || "Someone";
+      const rollValue = gameState.current_roll ? gameState.current_roll.roll : "?";
+      container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">${rollerName} rolled a ${rollValue}...</p>`;
+    }
+    return;
+  }
+
   if (gameState.active_player !== myPlayerIndex) {
     container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
     return;
   }
-  const phase = gameState.phase;
 
   if (phase === "start_turn" || phase === "choose_action") {
     addActionBtn(container, "Go On Board", "secondary", () => {
@@ -872,6 +896,38 @@ function buildActionButtons() {
     });
     addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
   }
+}
+
+function showRollResult(container) {
+  const roll = gameState.current_roll;
+  const phase = gameState.phase;
+
+  const dieImg = document.createElement("img");
+  dieImg.src = `${SERVER}/assets/dice/${roll.image}`;
+  dieImg.style.cssText = "width:70px; display:block; margin:0 auto 10px; border-radius:6px;";
+  container.appendChild(dieImg);
+
+  const label = document.createElement("p");
+  label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+  label.textContent = `You rolled a ${roll.roll}`;
+  container.appendChild(label);
+
+  const myPlayer = gameState.players[myPlayerIndex];
+
+  if (phase === "roll_with_barrels" && myPlayer.barrels > 0) {
+    addActionBtn(container, `Use Barrel to Reroll (${myPlayer.barrels} left)`, "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "reroll", player_index: myPlayerIndex });
+    });
+  } else if (phase === "roll_with_rerolls" && myPlayer.free_rerolls > 0) {
+    addActionBtn(container, `Use Free Reroll (${myPlayer.free_rerolls} left)`, "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "reroll", player_index: myPlayerIndex });
+    });
+  }
+
+  addActionBtn(container, "Confirm Roll", "", () => {
+    socket.emit("player_action", { room_id: myRoomId, type: "confirm_roll", player_index: myPlayerIndex });
+    closeActionPanel();
+  });
 }
 
 function addActionBtn(container, label, cls, fn) {
@@ -985,6 +1041,20 @@ function connectToGame(name, roomId, playerIndex) {
     }
     updateUI();
     buildActionButtons();
+
+    // Auto-surface the actions panel when it's this player's moment to
+    // act on a roll — easy to miss otherwise since it can happen outside
+    // their normal turn (e.g. a scorpion contest).
+    const rollPhases = ["roll_start", "roll_no_barrels", "roll_with_barrels", "roll_with_rerolls"];
+    if (rollPhases.includes(gameState.phase)) {
+      const rollerIndex = gameState.phase === "roll_start"
+        ? gameState.next_roller
+        : (gameState.current_roll || {}).player;
+      if (rollerIndex === myPlayerIndex) {
+        document.getElementById("action-panel").classList.add("open");
+      }
+    }
+
     if (needsBoardSizing) {
       requestAnimationFrame(() => {
         initBoardSize();
