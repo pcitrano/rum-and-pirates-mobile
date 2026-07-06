@@ -104,19 +104,13 @@
   .tableau-cards {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
   .tableau-card {
     width: 100%;
     border-radius: 3px;
     border: 1px solid var(--wood-light);
     display: block;
-  }
-  .tableau-card-points {
-    text-align: center;
-    font-size: 0.7rem;
-    color: var(--parchment);
-    margin-top: -2px;
   }
 
   /* ── Player status bar ── */
@@ -712,7 +706,6 @@ function renderTableau() {
         ${group.cards.map(({ card, category }) => `
           <div>
             <img class="tableau-card" src="${cardImageUrl(category, card)}" onerror="this.style.display='none'">
-            <div class="tableau-card-points">${card.points > 0 ? '+' : ''}${card.points}</div>
           </div>
         `).join("")}
       </div>
