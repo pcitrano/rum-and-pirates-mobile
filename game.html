@@ -62,16 +62,61 @@
   }
 
   /* ── Board area ── */
+  #board-row {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+  }
   #board-wrapper {
     flex: 1;
     position: relative;
     overflow: hidden;
     touch-action: none;
+    min-width: 0;
   }
   #board-canvas {
     position: absolute;
     top: 0; left: 0;
     image-rendering: crisp-edges;
+  }
+
+  /* ── Tableau side panel ── */
+  #tableau-panel {
+    flex-shrink: 0;
+    width: 92px;
+    background: rgba(13,27,42,0.97);
+    border-left: 2px solid var(--wood);
+    overflow-y: auto;
+    padding: 6px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tableau-group-label {
+    font-family: 'Pirata One', cursive;
+    font-size: 0.75rem;
+    color: var(--gold-light);
+    text-align: center;
+    margin-bottom: 2px;
+  }
+  .tableau-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tableau-card {
+    width: 100%;
+    border-radius: 3px;
+    border: 1px solid var(--wood-light);
+    display: block;
+  }
+  .tableau-card-points {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--parchment);
+    margin-top: -2px;
   }
 
   /* ── Player status bar ── */
@@ -90,8 +135,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 1.15rem; /* 0.95 */
-    padding: 6px 8px;
+    font-size: 0.95rem;
+    padding: 3px 6px;
     border-radius: 3px;
     transition: background 0.2s;
   }
@@ -252,13 +297,16 @@
     <button id="menu-toggle" onclick="toggleActionPanel()">☰ Actions</button>
   </div>
 
-  <!-- Board -->
-  <div id="board-wrapper">
-    <canvas id="board-canvas"></canvas>
+  <!-- Board + Tableau -->
+  <div id="board-row">
+    <div id="board-wrapper">
+      <canvas id="board-canvas"></canvas>
+    </div>
+    <div id="tableau-panel"></div>
   </div>
 
   <!-- Player status -->
-  <div id="status-bar" id="status-bar"></div>
+  <div id="status-bar"></div>
 </div>
 
 <!-- Action panel -->
@@ -299,27 +347,6 @@ let offsetY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
 let lastTouchDist = 0;
-
-// ── Space type colours for overlay dots ──────────────────────────────────────
-// const SPACE_COLORS = {
-//  coin:        "#f4d03f",
-//  start:       "#27ae60",
-//  barrels:     "#8b4513",
-//  recruit:     "#c0392b",
-//  rendezvous:  "#8e44ad",
-//  supply:      "#2980b9",
-//  guard:       "#7f8c8d",
-//  treasure:    "#d4ac0d",
-//  red_map:     "#e74c3c",
-//  green_map:   "#27ae60",
-//  blue_pub:    "#2980b9",
-//  green_pub:   "#27ae60",
-//  red_pub:     "#e74c3c",
-//  yellow_map:  "#f39c12",
-//  dark_alley:  "#2c3e50",
-//  normal:      null,
-//  edge:        null,
-//};
 
 // ── Board generation (mirrors GameSetup.py) ───────────────────────────────────
 function rotateNormalized(x, y, rotation) {
@@ -473,12 +500,11 @@ function renderBoard() {
 
   boardSpaces.forEach(space => {
     const { board_x: bx, board_y: by, type, id } = space;
-    //const color = SPACE_COLORS[type];
 
     // Captain piece
     if (id === captainPos) {
       ctx.beginPath();
-      ctx.arc(bx, by, 20, 0, Math.PI * 2);
+      ctx.arc(bx, by, 14, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.fill();
       ctx.strokeStyle = "#c9922a";
@@ -491,25 +517,6 @@ function renderBoard() {
       ctx.fillText("⚓", bx, by);
       return;
     }
-
-    // Legal move highlights
-    //if (isMyTurn && legalDestIds.has(id)) {
-    //  ctx.beginPath();
-    //  ctx.arc(bx, by, 13, 0, Math.PI * 2);
-    //  ctx.fillStyle = "rgba(232,184,75,0.55)";
-    //  ctx.fill();
-    //  ctx.strokeStyle = "#e8b84b";
-    //  ctx.lineWidth = 2.5;
-    //  ctx.stroke();
-    //}
-
-    // Coloured dot for special spaces
-    //if (color && space.captain_space) {
-    //  ctx.beginPath();
-    //  ctx.arc(bx, by, 7, 0, Math.PI * 2);
-    //  ctx.fillStyle = color + "cc";
-    //  ctx.fill();
-    //}
   });
 
   // Draw occupied paths — players don't have board positions, only occupied paths
@@ -523,14 +530,14 @@ function renderBoard() {
       const space = spaceLoookup[spaceId];
       if (!space) return;
       ctx.beginPath();
-      ctx.arc(space.board_x, space.board_y, 10, 0, Math.PI * 2);
+      ctx.arc(space.board_x, space.board_y, 5, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
     });
   });
 
   ctx.restore();
-};
+}
 
 // ── Touch / pan / zoom ────────────────────────────────────────────────────────
 function initBoardSize() {
@@ -654,17 +661,76 @@ function promptMove(move) {
   document.getElementById("action-panel").classList.add("open");
 }
 
+// ── Tableau panel ─────────────────────────────────────────────────────────────
+const CARD_FOLDERS = {
+  pubs: "pubs",
+  maps: "maps",
+  treasure: "treasure",
+  scorpion: "treasure",
+  wrangle_bunk: "wrangle",
+  wrangle_hammock: "wrangle",
+  wrangle_bedroll: "wrangle"
+};
+
+function cardImageUrl(category, card) {
+  if (!card || !card.image_file) return "";
+  const folder = CARD_FOLDERS[category] || category;
+  return `${SERVER}/assets/${folder}/${card.image_file}`;
+}
+
+function renderTableau() {
+  const panel = document.getElementById("tableau-panel");
+  const tableau = gameState.tableau;
+  if (!tableau) { panel.innerHTML = ""; return; }
+
+  const groups = [];
+
+  if (tableau.pubs && tableau.pubs.length) {
+    groups.push({ label: "Pubs", cards: tableau.pubs.map(c => ({ card: c, category: "pubs" })) });
+  }
+  if (tableau.maps && tableau.maps.length) {
+    groups.push({ label: "Maps", cards: tableau.maps.map(c => ({ card: c, category: "maps" })) });
+  }
+  if (tableau.treasure) {
+    groups.push({ label: "Treasure", cards: [{ card: tableau.treasure, category: "treasure" }] });
+  }
+  if (tableau.scorpion) {
+    groups.push({ label: "Scorpion", cards: [{ card: tableau.scorpion, category: "scorpion" }] });
+  }
+  if (tableau.wrangle_bunk || tableau.wrangle_hammock || tableau.wrangle_bedroll) {
+    const wrangleCards = [];
+    if (tableau.wrangle_bunk) wrangleCards.push({ card: tableau.wrangle_bunk, category: "wrangle_bunk" });
+    if (tableau.wrangle_hammock) wrangleCards.push({ card: tableau.wrangle_hammock, category: "wrangle_hammock" });
+    if (tableau.wrangle_bedroll) wrangleCards.push({ card: tableau.wrangle_bedroll, category: "wrangle_bedroll" });
+    groups.push({ label: "Wrangle", cards: wrangleCards });
+  }
+
+  panel.innerHTML = groups.map(group => `
+    <div>
+      <div class="tableau-group-label">${group.label}</div>
+      <div class="tableau-cards">
+        ${group.cards.map(({ card, category }) => `
+          <div>
+            <img class="tableau-card" src="${cardImageUrl(category, card)}" onerror="this.style.display='none'">
+            <div class="tableau-card-points">${card.points > 0 ? '+' : ''}${card.points}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+}
+
 // ── UI updates ────────────────────────────────────────────────────────────────
 function updateUI() {
   if (!gameState) return;
 
   if (gameState.phase === "character_select") {
-    document.getElementById("board-wrapper").style.display = "none";
+    document.getElementById("board-row").style.display = "none";
     document.getElementById("status-bar").style.display = "none";
     renderCharacterSelect();
     return;
   } else {
-    document.getElementById("board-wrapper").style.display = "";
+    document.getElementById("board-row").style.display = "";
     document.getElementById("status-bar").style.display = "";
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
@@ -672,6 +738,8 @@ function updateUI() {
 
   document.getElementById("round-display").textContent = `Round ${gameState.round || "—"} of 5`;
   document.getElementById("room-display").textContent = `Room: ${myRoomId || "—"}`;
+
+  renderTableau();
 
   // Status bar
   const bar = document.getElementById("status-bar");
@@ -741,7 +809,7 @@ function renderCharacterSelect() {
           opacity:${alreadyConfirmed && mySelection !== c.name ? '0.4' : '1'};
           background:#2a1810;
         ">
-          <img src="${SERVER}/assets/characters/${c.image}" style="width:100%;border-radius:4px;" onerror="this.style.display='none'">
+          <img src="${SERVER}/assets/${c.image}" style="width:100%;border-radius:4px;" onerror="this.style.display='none'">
           <p style="color:#f2dfa7;text-align:center;font-size:0.85rem;margin-top:6px;">${c.name}</p>
         </div>
       `).join("")}
@@ -868,7 +936,7 @@ function loadTileImages() {
         if (loaded === 9) resolve();
       };
       img.onerror = () => { loaded++; if (loaded === 9) resolve(); };
-      img.src = `${SERVER}/assets/tiles/tile_${i}.jpg`;
+      img.src = `${SERVER}/assets/tile_${i}.jpg`;
     }
   });
 }
