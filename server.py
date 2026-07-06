@@ -119,11 +119,7 @@ def on_update_state(data):
 
 @socketio.on("player_action")
 def on_player_action(data):
-    """
-    Executes core turn actions server-side: move, rest, go_on_board,
-    move_again. Any action not yet migrated is relayed to other clients
-    as before, in case the desktop host still handles it locally.
-    """
+
     room_id = data["room_id"]
     action_type = data.get("type")
 
@@ -156,6 +152,9 @@ def on_player_action(data):
 
     elif action_type == "move_again":
         gameplay.move_again(game_state)
+
+    elif action_type == "avast":
+        gameplay.avast_turn(game_state)
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)

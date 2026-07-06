@@ -90,8 +90,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.95rem;
-    padding: 3px 6px;
+    font-size: 1.15rem; /* 0.95 */
+    padding: 6px 8px;
     border-radius: 3px;
     transition: background 0.2s;
   }
@@ -792,6 +792,19 @@ function buildActionButtons() {
     });
     addActionBtn(container, "Rest", "secondary", () => {
       socket.emit("player_action", { room_id: myRoomId, type: "rest", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+  } else if (phase === "post_move") {
+    const myPlayer = gameState.players[myPlayerIndex];
+    const canMoveAgain = myPlayer && myPlayer.coins > 0;
+    addActionBtn(container, canMoveAgain ? "Move Again (1 coin)" : "Move Again (no coins)", "secondary", () => {
+      if (!canMoveAgain) return;
+      socket.emit("player_action", { room_id: myRoomId, type: "move_again", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    addActionBtn(container, "Avast (End Turn)", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "avast", player_index: myPlayerIndex });
       closeActionPanel();
     });
     addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
