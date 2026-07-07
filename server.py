@@ -140,8 +140,6 @@ def on_player_action(data):
             emit("error", {"message": "Illegal move"})
             return
 
-        # Auto-confirm — the web client already shows a confirm dialog
-        # before sending the move, so no separate confirm_move round trip.
         gameplay.confirm_move(game_state)
 
     elif action_type == "rest":
@@ -168,6 +166,9 @@ def on_player_action(data):
 
     elif action_type == "reroll":
         gameplay.resolve_reroll(game_state)
+
+    elif action_type == "confirm_rendezvous":
+        gameplay.confirm_rendezvous(game_state)
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)

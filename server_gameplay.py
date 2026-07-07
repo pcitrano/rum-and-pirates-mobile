@@ -268,7 +268,7 @@ class ServerGameplay:
         game_state["pending_move"] = None
         game_state["phase"] = "start_turn"
 
-    # ── Space resolution (simple spaces only for now) ───────────────────
+    # ── Space resolution  ──────────────────────────────────────
 
     def resolve_space(self, game_state, space):
         player = game_state["players"][game_state["active_player"]]
@@ -284,7 +284,11 @@ class ServerGameplay:
             return self.recruit_space(game_state, player)
         elif space["type"] == "treasure":
             return self.treasure_space(game_state)
-
+        elif space["type"] in ("green_map", "yellow_map", "red_map"):
+            return self.map_space(game_state, player, space)
+        elif space["type"] == "rendezvous":
+            self.log_action(game_state, f"{player['name']} set a hot date with a wench.")
+            return self.rendezvous_space(game_state)
         else:
             # Not yet migrated (pubs, maps, guards, supply, rendezvous,
             # treasure, scorpion, start/reclaim). Log it and let the turn
@@ -312,6 +316,45 @@ class ServerGameplay:
         player["pirate_reserve"] -= 1
         self.log_action(game_state, f"{player['name']} added an ally to their cause.")
         game_state["phase"] = "post_move"
+
+    def map_space(self, game_state, player, space):
+        target_color = space["type"].replace("_map", "")
+
+        matching_maps = [
+            card for card in game_state["tableau"]["maps"]
+            if card["color"] == target_color
+        ]
+
+        if len(matching_maps) == 0:
+            self.log_action(game_state, f"{player['name']} got lost without a map!")
+            game_state["phase"] = "post_move"
+            return
+
+        best_map = max(matching_maps, key=lambda card: card["points"])
+        player["maps"].append(best_map)
+        self.log_action(game_state, f"{player['name']} found a piece of a {target_color} map.")
+
+        game_state["tableau"]["maps"].remove(best_map)
+        game_state["tableau"]["maps"].append(game_state["decks"]["maps"].pop())
+
+        game_state["phase"] = "post_move"
+        self.score_players(game_state)
+
+    def rendezvous_space(self, game_state):
+        if not game_state["decks"]["rendezvous"]:
+            game_state["phase"] = "post_move"
+            return
+
+        game_state["phase"] = "rendezvous_card"
+        game_state["rendezvous"] = game_state["decks"]["rendezvous"].pop()
+        self.score_players(game_state)
+
+    def confirm_rendezvous(self, game_state):
+        player = game_state["players"][game_state["active_player"]]
+        player["rendezvous"].append(game_state["rendezvous"])
+        game_state["rendezvous"] = None
+        game_state["phase"] = "post_move"
+        self.score_players(game_state)
 
     def treasure_space(self, game_state):
         player = game_state["players"][game_state["active_player"]]

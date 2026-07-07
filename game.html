@@ -935,6 +935,23 @@ function buildActionButtons() {
       closeActionPanel();
     });
     addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+  } else if (phase === "rendezvous_card") {
+    const card = gameState.rendezvous;
+    if (card) {
+      const img = document.createElement("img");
+      img.src = `${SERVER}/assets/rendezvous/${card.image_file}`;
+      img.style.cssText = "width:140px; display:block; margin:0 auto 10px; border-radius:6px; border:2px solid var(--gold);";
+      container.appendChild(img);
+
+      const label = document.createElement("p");
+      label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+      label.textContent = `A rendezvous awaits — worth ${card.points} points if completed`;
+      container.appendChild(label);
+    }
+    addActionBtn(container, "Collect Card", "", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "confirm_rendezvous", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
   } else if (phase === "post_move") {
     const myPlayer = gameState.players[myPlayerIndex];
     const canMoveAgain = myPlayer && myPlayer.coins > 0;
@@ -1106,6 +1123,10 @@ function connectToGame(name, roomId, playerIndex) {
       if (rollerIndex === myPlayerIndex) {
         document.getElementById("action-panel").classList.add("open");
       }
+    }
+
+    if (gameState.phase === "rendezvous_card" && gameState.active_player === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
     }
 
     if (needsBoardSizing) {
