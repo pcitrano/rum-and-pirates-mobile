@@ -323,6 +323,10 @@
   <div id="board-row">
     <div id="board-wrapper">
       <canvas id="board-canvas"></canvas>
+      <div id="contest-overlay">
+        <div class="contest-turn" id="contest-turn-label"></div>
+        <div class="contest-progress" id="contest-progress-label"></div>
+      </div>
     </div>
     <div id="tableau-panel"></div>
   </div>
@@ -417,6 +421,10 @@ function buildBoardFromSeed(seed) {
   let spaceLookup = {};
   allSpaces.forEach(s => { spaceLookup[s.id] = s; });
 
+  // connect edge spaces
+  // IMPORTANT: must match the server's merge order exactly (sorted by id,
+  // index-based pairs) so the same new-space IDs land on the same
+  // board_x/board_y here as they do in the server's space_lookup.
   const edgeSpaces = allSpaces.filter(s => s.type === "edge").sort((a, b) => a.id - b.id);
   const toRemove = new Set();
   const newSpaces = [];
@@ -1124,7 +1132,6 @@ function connectToGame(name, roomId, playerIndex) {
         document.getElementById("action-panel").classList.add("open");
       }
     }
-
     if (gameState.phase === "rendezvous_card" && gameState.active_player === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
