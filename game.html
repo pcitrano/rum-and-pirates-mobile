@@ -594,7 +594,6 @@ canvas.addEventListener("pointerup", e => {
   if (dx < 8 && dy < 8) handleBoardTap(e.clientX, e.clientY);
   isPanning = false;
 });
-
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.1 : 0.9;
@@ -902,8 +901,6 @@ function buildActionButtons() {
   if (!gameState || gameState.phase === "character_select") return;
   const phase = gameState.phase;
 
-  // Roll phases can apply to a player other than active_player (e.g. a
-  // scorpion contest passes the roll around the table).
   if (phase === "roll_start") {
     if (gameState.next_roller === myPlayerIndex) {
       addActionBtn(container, "🎲 Roll the Die", "", () => {
@@ -943,6 +940,7 @@ function buildActionButtons() {
       closeActionPanel();
     });
     addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+  
   } else if (phase === "rendezvous_card") {
     const card = gameState.rendezvous;
     if (card) {
@@ -960,6 +958,66 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "confirm_rendezvous", player_index: myPlayerIndex });
       closeActionPanel();
     });
+  
+  } else if (phase === "supply_card") {
+    const card = gameState.supply;
+    if (card) {
+      const img = document.createElement("img");
+      img.src = `${SERVER}/assets/supplies/${card.image_file}`;
+      img.style.cssText = "width:140px; display:block; margin:0 auto 10px; border-radius:6px; border:2px solid var(--gold);";
+      container.appendChild(img);
+
+      const label = document.createElement("p");
+      label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+      label.textContent = `Worth ${card.points} points — keep it, or sell it for 2 coins`;
+      container.appendChild(label);
+    }
+    addActionBtn(container, "Keep Card", "", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "supply_choice", keep_card: true, player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    addActionBtn(container, "Sell for 2 Coins", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "supply_choice", keep_card: false, player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+  
+  } else if (phase === "har_supply") {
+    const cardA = gameState.supply;
+    const cardB = gameState.har_supply;
+
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:10px;";
+    label.textContent = "Choose one, or sell both for 2 coins";
+    container.appendChild(label);
+
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; gap:8px; margin-bottom:12px;";
+
+    [cardA, cardB].forEach((card, i) => {
+      if (!card) return;
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "flex:1; text-align:center;";
+      const img = document.createElement("img");
+      img.src = `${SERVER}/assets/supplies/${card.image_file}`;
+      img.style.cssText = "width:100%; border-radius:6px; border:2px solid var(--gold); cursor:pointer;";
+      img.onclick = () => {
+        socket.emit("player_action", { room_id: myRoomId, type: "har_supply_choice", chosen_index: i, player_index: myPlayerIndex });
+        closeActionPanel();
+      };
+      const pts = document.createElement("p");
+      pts.style.cssText = "color:var(--gold-light); font-size:0.85rem; margin-top:4px;";
+      pts.textContent = `${card.points} pts`;
+      wrap.appendChild(img);
+      wrap.appendChild(pts);
+      row.appendChild(wrap);
+    });
+    container.appendChild(row);
+
+    addActionBtn(container, "Sell Both for 2 Coins", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "har_supply_choice", chosen_index: null, player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+  
   } else if (phase === "post_move") {
     const myPlayer = gameState.players[myPlayerIndex];
     const canMoveAgain = myPlayer && myPlayer.coins > 0;

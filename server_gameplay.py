@@ -398,6 +398,60 @@ class ServerGameplay:
             game_state["scorpion_contest"]["player_index"] = next_player
             self.roll_start(game_state, next_player)
 
+    def supply_space(self, game_state, player):
+        if not game_state["decks"]["supplies"]:
+            game_state["phase"] = "post_move"
+            return
+
+        game_state["supply"] = game_state["decks"]["supplies"].pop()
+
+        is_har = player["character"] is not None and player["character"]["name"] == "Captain Har the Hoarder"
+        if is_har and game_state["decks"]["supplies"]:
+            game_state["har_supply"] = game_state["decks"]["supplies"].pop()
+            game_state["phase"] = "har_supply"
+        else:
+            game_state["phase"] = "supply_card"
+
+    def resolve_supply_choice(self, game_state, keep_card):
+        player = game_state["players"][game_state["active_player"]]
+
+        if keep_card:
+            player["supplies"].append(game_state["supply"])
+            self.log_action(game_state, f"{player['name']} stashed the supplies for later.")
+        else:
+            game_state["decks"]["supplies"].insert(0, game_state["supply"])
+            player["coins"] += 2
+            self.log_action(game_state, f"{player['name']} sold the supplies for a profit.")
+
+        game_state["supply"] = None
+        game_state["phase"] = "post_move"
+        self.score_players(game_state)
+
+    def resolve_har_supply(self, game_state, chosen_index):
+
+        player = game_state["players"][game_state["active_player"]]
+        card_a = game_state["supply"]
+        card_b = game_state["har_supply"]
+
+        if chosen_index == 0:
+            player["supplies"].append(card_a)
+            game_state["decks"]["supplies"].insert(0, card_b)
+            self.log_action(game_state, f"{player['name']} picked the better of two supplies.")
+        elif chosen_index == 1:
+            player["supplies"].append(card_b)
+            game_state["decks"]["supplies"].insert(0, card_a)
+            self.log_action(game_state, f"{player['name']} picked the better of two supplies.")
+        else:
+            game_state["decks"]["supplies"].insert(0, card_a)
+            game_state["decks"]["supplies"].insert(0, card_b)
+            player["coins"] += 2
+            self.log_action(game_state, f"{player['name']} sold both supplies for a profit.")
+
+        game_state["supply"] = None
+        game_state["har_supply"] = None
+        game_state["phase"] = "post_move"
+        self.score_players(game_state)
+
     # ── Dice Rolling ────────────────────────────────────────────────────────
     def roll_start(self, game_state, player_index):
         game_state["next_roller"] = player_index

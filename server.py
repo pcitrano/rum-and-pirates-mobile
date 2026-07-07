@@ -170,6 +170,12 @@ def on_player_action(data):
     elif action_type == "confirm_rendezvous":
         gameplay.confirm_rendezvous(game_state)
 
+    elif action_type == "supply_choice":
+        gameplay.resolve_supply_choice(game_state, data.get("keep_card", False))
+
+    elif action_type == "har_supply_choice":
+        gameplay.resolve_har_supply(game_state, data.get("chosen_index"))
+
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)
         emit("action_received", data, room=room_id, include_self=False)
