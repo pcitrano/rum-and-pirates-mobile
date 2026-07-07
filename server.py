@@ -176,6 +176,9 @@ def on_player_action(data):
     elif action_type == "har_supply_choice":
         gameplay.resolve_har_supply(game_state, data.get("chosen_index"))
 
+    elif action_type == "answer_pub_invite":
+        gameplay.answer_pub_invite(game_state, data.get("joined", False))
+
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)
         emit("action_received", data, room=room_id, include_self=False)

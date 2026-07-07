@@ -452,6 +452,149 @@ class ServerGameplay:
         game_state["phase"] = "post_move"
         self.score_players(game_state)
 
+    def pub_space(self, game_state, player, color):
+        active_player = game_state["active_player"]
+        is_duncan = player["character"] is not None and player["character"]["name"] == "Captain Duncan the Drunken"
+
+        matching_cards = [
+            card for card in game_state["tableau"]["pubs"]
+            if card["color"] == color
+        ]
+
+        # Duncan draws a bonus tile — free if the tableau has none of this
+        # color, otherwise added to the tableau for everyone to compete for.
+        if is_duncan:
+            matching_deck = [c for c in game_state["decks"]["pubs"] if c["color"] == color]
+            if matching_deck:
+                bonus = matching_deck[0]
+                game_state["decks"]["pubs"].remove(bonus)
+                if not matching_cards:
+                    player["pubs"].append(bonus)
+                    self.log_action(game_state, f"{player['name']} charmed the barkeep and claimed {bonus['points']} free pints of ale!")
+                    self.score_players(game_state)
+                    game_state["phase"] = "post_move"
+                    return
+                else:
+                    game_state["tableau"]["pubs"].append(bonus)
+                    self.log_action(game_state, f"{player['name']} bought the bar another round!")
+                    matching_cards.append(bonus)
+
+        if not matching_cards:
+            self.log_action(game_state, f"{player['name']} went to the pub, but it was closed.")
+            game_state["phase"] = "post_move"
+            return
+
+        game_state["pub"] = {
+            "color": color,
+            "invite_index": 1,
+            "participants": [active_player],
+            "rolling_index": 0,
+            "current_ask": (active_player + 1) % len(game_state["players"]),
+            "pub_active": False
+        }
+        game_state["phase"] = "pub_invite"
+
+    def get_next_player(self, game_state, offset):
+        players = game_state["players"]
+        host = game_state["active_player"]
+        return (host + offset) % len(players)
+    
+    def answer_pub_invite(self, game_state, joined):
+        pub = game_state["pub"]
+        players = game_state["players"]
+        player_index = self.get_next_player(game_state, pub["invite_index"])
+        player = players[player_index]
+
+        if joined and player["coins"] > 0:
+            pub["participants"].append(player_index)
+            player["coins"] -= 1
+            players[game_state["active_player"]]["coins"] += 1
+            self.log_action(game_state, f"{player['name']} paid the cover fee and entered the pub.")
+        else:
+            self.log_action(game_state, f"{player['name']} stayed home today.")
+
+        pub["invite_index"] += 1
+        pub["current_ask"] = (pub["current_ask"] + 1) % len(players)
+
+        if pub["invite_index"] >= len(players):
+            pub["rolling_index"] = 0
+            game_state["phase"] = "pub_roll"
+            self.start_pub(game_state)
+            return
+
+    def start_pub(self, game_state):
+        pub = game_state["pub"]
+        captain_space = game_state["captain_space"]
+        space_type = game_state["space_lookup"][captain_space]["type"]
+        color = space_type.replace("_pub", "")
+        active_player = game_state["active_player"]
+        player = game_state["players"][active_player]
+
+        if len(pub["participants"]) == 1:
+            eligible_cards = [
+                card for card in game_state["tableau"]["pubs"]
+                if card["color"] == color
+            ]
+            total = sum(c["points"] for c in eligible_cards)
+            self.log_action(game_state, f"{player['name']} drank {total} pints alone.")
+
+            for c in eligible_cards:
+                player["pubs"].append(c)
+                game_state["tableau"]["pubs"].remove(c)
+
+            while len(game_state["tableau"]["pubs"]) < 4 and game_state["decks"]["pubs"]:
+                game_state["tableau"]["pubs"].append(game_state["decks"]["pubs"].pop())
+
+            game_state["phase"] = "post_move"
+            self.score_players(game_state)
+            return
+
+        game_state["pub"]["pub_active"] = True
+        self.roll_start(game_state, active_player)
+
+    def resolve_pub(self, game_state):
+        captain_space = game_state["captain_space"]
+        space_type = game_state["space_lookup"][captain_space]["type"]
+
+        player_id = game_state["current_roll"]["player"]
+        player = game_state["players"][player_id]
+        roll_value = game_state["current_roll"]["roll"]
+        player["free_rerolls"] = 0
+        pub = game_state["pub"]
+
+        color = space_type.replace("_pub", "")
+        eligible_cards = [
+            card for card in game_state["tableau"]["pubs"]
+            if card["color"] == color and card["points"] < roll_value
+        ]
+
+        if not eligible_cards:
+            pub["rolling_index"] = (pub["rolling_index"] + 1) % len(pub["participants"])
+            next_player = pub["participants"][pub["rolling_index"]]
+            return self.roll_start(game_state, next_player)
+
+        won_card = max(eligible_cards, key=lambda card: card["points"])
+        player["pubs"].append(won_card)
+        game_state["tableau"]["pubs"].remove(won_card)
+        self.log_action(game_state, f"{player['name']} downed {won_card['points']} pints of ale.")
+        self.score_players(game_state)
+
+        more_cards = [
+            card for card in game_state["tableau"]["pubs"]
+            if card["color"] == color
+        ]
+
+        if more_cards:
+            pub["rolling_index"] = (pub["rolling_index"] + 1) % len(pub["participants"])
+            next_player = pub["participants"][pub["rolling_index"]]
+            return self.roll_start(game_state, next_player)
+        else:
+            while len(game_state["tableau"]["pubs"]) < 4 and game_state["decks"]["pubs"]:
+                game_state["tableau"]["pubs"].append(game_state["decks"]["pubs"].pop())
+            game_state["phase"] = "post_move"
+            game_state["pub"]["pub_active"] = False
+            self.score_players(game_state)
+
     # ── Dice Rolling ────────────────────────────────────────────────────────
     def roll_start(self, game_state, player_index):
         game_state["next_roller"] = player_index

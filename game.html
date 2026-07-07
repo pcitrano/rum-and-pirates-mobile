@@ -751,9 +751,13 @@ function renderTableau() {
 function renderContestOverlay() {
   const overlay = document.getElementById("contest-overlay");
   const contest = gameState.scorpion_contest;
+  const pub = gameState.pub;
   const rollPhases = ["roll_start", "roll_no_barrels", "roll_with_barrels", "roll_with_rerolls"];
 
-  if (!contest || !contest.contest_active || !rollPhases.includes(gameState.phase)) {
+  const scorpionActive = contest && contest.contest_active && rollPhases.includes(gameState.phase);
+  const pubActive = pub && pub.pub_active && rollPhases.includes(gameState.phase);
+
+  if (!scorpionActive && !pubActive) {
     overlay.style.display = "none";
     return;
   }
@@ -764,9 +768,16 @@ function renderContestOverlay() {
   const roller = gameState.players[rollerIndex];
   const rollerName = roller ? roller.name : "Someone";
 
-  document.getElementById("contest-turn-label").textContent = `🦂 ${rollerName}'s roll`;
-  document.getElementById("contest-progress-label").innerHTML =
-    `<strong>${contest.total}</strong> / ${contest.target} to get stung`;
+  if (scorpionActive) {
+    document.getElementById("contest-turn-label").textContent = `🦂 ${rollerName}'s roll`;
+    document.getElementById("contest-progress-label").innerHTML =
+      `<strong>${contest.total}</strong> / ${contest.target} to get stung`;
+  } else {
+    const participantNames = pub.participants.map(i => (gameState.players[i] || {}).name || "?").join(", ");
+    document.getElementById("contest-turn-label").textContent = `🍺 ${rollerName}'s roll`;
+    document.getElementById("contest-progress-label").innerHTML =
+      `Rolling for the <strong>${pub.color}</strong> pub — ${participantNames}`;
+  }
 
   overlay.style.display = "block";
 }
@@ -921,6 +932,29 @@ function buildActionButtons() {
       const rollerName = (gameState.players[rollerIndex] || {}).name || "Someone";
       const rollValue = gameState.current_roll ? gameState.current_roll.roll : "?";
       container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">${rollerName} rolled a ${rollValue}...</p>`;
+    }
+    return;
+  }
+
+  if (phase === "pub_invite") {
+    const pub = gameState.pub;
+    const askedIndex = pub ? pub.current_ask : null;
+    if (askedIndex === myPlayerIndex) {
+      const myCoins = gameState.players[myPlayerIndex].coins;
+      const label = document.createElement("p");
+      label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+      label.textContent = `Join the ${pub.color} pub for 1 coin?`;
+      container.appendChild(label);
+      addActionBtn(container, myCoins > 0 ? "Join (1 coin)" : "Join (no coins)", "", () => {
+        if (myCoins <= 0) return;
+        socket.emit("player_action", { room_id: myRoomId, type: "answer_pub_invite", joined: true, player_index: myPlayerIndex });
+      });
+      addActionBtn(container, "Stay Home", "secondary", () => {
+        socket.emit("player_action", { room_id: myRoomId, type: "answer_pub_invite", joined: false, player_index: myPlayerIndex });
+      });
+    } else {
+      const askedName = (gameState.players[askedIndex] || {}).name || "Someone";
+      container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Asking ${askedName} to join the pub...</p>`;
     }
     return;
   }
@@ -1191,6 +1225,12 @@ function connectToGame(name, roomId, playerIndex) {
       }
     }
     if (gameState.phase === "rendezvous_card" && gameState.active_player === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
+    }
+    if ((gameState.phase === "supply_card" || gameState.phase === "har_supply") && gameState.active_player === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
+    }
+    if (gameState.phase === "pub_invite" && gameState.pub && gameState.pub.current_ask === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
 
