@@ -363,13 +363,23 @@ class ServerGameplay:
         })
 
         final_space_id = exit_move["captain"]
-        old_space = game_state["space_lookup"][start_space]
-        old_space["captain"] = False
-        new_space = game_state["space_lookup"][final_space_id]
-        new_space["captain"] = True
-        game_state["captain_space"] = final_space_id
-        game_state["legal_moves"] = game_state["captain_graph"].get(final_space_id) \
-            or game_state["captain_graph"].get(str(final_space_id))
+        old_space = game_state["space_lookup"].get(start_space) or game_state["space_lookup"].get(str(start_space))
+        if old_space:
+            old_space["captain"] = False
+            
+        new_space = game_state["space_lookup"].get(final_space_id) or game_state["space_lookup"].get(str(final_space_id))
+        if new_space is None:
+            # Fallback string-to-int cast if the dictionary keys are strictly numeric types
+            new_space = game_state["space_lookup"].get(int(final_space_id))
+            
+        if new_space:
+            new_space["captain"] = True
+            game_state["captain_space"] = new_space["id"] # Use the strict integer ID from the space
+        else:
+            return False # Fail gracefully if space structure is corrupted
+
+        game_state["legal_moves"] = game_state["captain_graph"].get(game_state["captain_space"]) \
+            or game_state["captain_graph"].get(str(game_state["captain_space"]))
 
         rendezvous_scored = False
         for card in player["rendezvous"]:
