@@ -683,7 +683,7 @@ function promptDarkAlleyExit(exitId, exitMove) {
   const container = document.getElementById("action-buttons");
   const entryMove = (gameState.dark_alley || {}).entry_move || { cost: 0 };
   const myPlayer = gameState.players[myPlayerIndex];
-  const entryCost = ientryMove.cost;
+  const entryCost = entryMove.cost;
   const totalCost = entryCost + exitMove.cost;
 
   container.innerHTML = `

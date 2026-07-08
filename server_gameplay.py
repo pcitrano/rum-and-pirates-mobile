@@ -408,6 +408,8 @@ class ServerGameplay:
         elif space["type"] == "rendezvous":
             self.log_action(game_state, f"{player['name']} set a hot date with a wench.")
             return self.rendezvous_space(game_state)
+        elif space["type"] == "supply":
+            return self.supply_space(game_state)
         elif space["type"] in ("red_pub", "blue_pub", "green_pub"):
             color = space["type"].replace("_pub", "")
             return self.pub_space(game_state, player, color)
