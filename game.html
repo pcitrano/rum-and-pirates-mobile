@@ -366,7 +366,7 @@ let myPlayerIndex = null;
 let tileData = [];       // raw JSON for all 9 tiles
 let tileImages = [];     // loaded Image objects
 let boardSpaces = [];    // computed spaces with board_x, board_y
-let spaceLoookup = {};
+let spaceLookup = {};
 let scale = 1;
 let offsetX = 0;
 let offsetY = 0;
@@ -556,7 +556,7 @@ function renderBoard() {
     const c = player.color;
     const color = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || "#fff");
     (path.path || []).forEach(spaceId => {
-      const space = spaceLoookup[spaceId];
+      const space = spaceLookup[spaceId];
       if (!space) return;
       ctx.beginPath();
       ctx.arc(space.board_x, space.board_y, 5, 0, Math.PI * 2);
@@ -651,7 +651,7 @@ function handleBoardTap(clientX, clientY) {
     for (const [idStr, exitMove] of Object.entries(gameState.alley_lookup || {})) {
       const exitId = parseInt(idStr);
       if (exitId === entranceId) continue;
-      const boardSpace = spaceLoookup[exitId];
+      const boardSpace = spaceLookup[exitId];
       if (!boardSpace || !boardSpace.hitbox_radius) continue;
       const dx = bx - boardSpace.board_x, dy = by - boardSpace.board_y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -668,7 +668,7 @@ function handleBoardTap(clientX, clientY) {
   const legalMoves = gameState.legal_moves || [];
 
   for (const move of legalMoves) {
-    const boardSpace = spaceLoookup[move.destination];
+    const boardSpace = spaceLookup[move.destination];
     if (!boardSpace || !boardSpace.hitbox_radius) continue;
     const dx = bx - boardSpace.board_x, dy = by - boardSpace.board_y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1290,7 +1290,7 @@ function connectToGame(name, roomId, playerIndex) {
       setLoading("Building board...");
       const { allSpaces, spaceLookup } = buildBoardFromSeed(gameState.board_seed);
       boardSpaces = allSpaces;
-      spaceLoookup = spaceLookup;
+      spaceLookup = spaceLookup;
       needsBoardSizing = true;
     }
     updateUI();
