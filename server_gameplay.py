@@ -536,12 +536,12 @@ class ServerGameplay:
 
         game_state["supply"] = game_state["decks"]["supplies"].pop()
 
-        is_har = player["character"] is not None and player["character"]["name"] == "Captain Har the Hoarder"
-        if is_har and game_state["decks"]["supplies"]:
-            game_state["har_supply"] = game_state["decks"]["supplies"].pop()
-            game_state["phase"] = "har_supply"
-        else:
-            game_state["phase"] = "supply_card"
+        #is_har = player["character"] is not None and player["character"]["name"] == "Captain Har the Hoarder"
+        #if is_har and game_state["decks"]["supplies"]:
+           # game_state["har_supply"] = game_state["decks"]["supplies"].pop()
+            #game_state["phase"] = "har_supply"
+        #else:
+        game_state["phase"] = "supply_card"
 
     def resolve_supply_choice(self, game_state, keep_card):
         player = game_state["players"][game_state["active_player"]]
