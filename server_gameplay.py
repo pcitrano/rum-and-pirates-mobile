@@ -418,7 +418,7 @@ class ServerGameplay:
             self.log_action(game_state, f"{player['name']} set a hot date with a wench.")
             return self.rendezvous_space(game_state)
         elif space["type"] == "supply":
-            return self.supply_space(game_state)
+            return self.supply_space(game_state, player)
         elif space["type"] in ("red_pub", "blue_pub", "green_pub"):
             color = space["type"].replace("_pub", "")
             return self.pub_space(game_state, player, color)
@@ -528,19 +528,19 @@ class ServerGameplay:
             game_state["scorpion_contest"]["player_index"] = next_player
             self.roll_start(game_state, next_player)
 
-    def supply_space(self, game_state):
+    def supply_space(self, game_state, player):
         if not game_state["decks"]["supplies"]:
             game_state["phase"] = "post_move"
             return
 
         game_state["supply"] = game_state["decks"]["supplies"].pop()
 
-        #is_har = player["character"] is not None and player["character"]["name"] == "Captain Har the Hoarder"
-        #if is_har and game_state["decks"]["supplies"]:
-           # game_state["har_supply"] = game_state["decks"]["supplies"].pop()
-            #game_state["phase"] = "har_supply"
-        #else:
-        game_state["phase"] = "supply_card"
+        is_har = player["character"] is not None and player["character"]["name"] == "Captain Har the Hoarder"
+        if is_har and game_state["decks"]["supplies"]:
+            game_state["har_supply"] = game_state["decks"]["supplies"].pop()
+            game_state["phase"] = "har_supply"
+        else:
+            game_state["phase"] = "supply_card"
 
     def resolve_supply_choice(self, game_state, keep_card):
         player = game_state["players"][game_state["active_player"]]
@@ -780,6 +780,8 @@ class ServerGameplay:
             return  # not yet migrated
         if space_type == "treasure":
             return self.resolve_scorpion(game_state)
+        if space_type in ("blue_pub", "green_pub", "red_pub"):
+            return self.resolve_pub(game_state)
         # pubs and other roll types aren't migrated yet
 
     # ── Turn flow ────────────────────────────────────────────────────────
