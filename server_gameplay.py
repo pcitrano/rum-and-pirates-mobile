@@ -184,6 +184,7 @@ class ServerGameplay:
 
         players = game_state["players"]
         current = game_state["active_player"]
+        player = players[current]
 
         selected_move = next(
             (m for m in game_state["legal_moves"] if m["destination"] == destination_id),
@@ -193,9 +194,24 @@ class ServerGameplay:
             return False
 
         if selected_move["destination_type"] == "dark_alley":
-            # Dark alley routing isn't migrated yet — reject cleanly rather
-            # than leaving the game_state in a half-built dark_alley phase.
-            return None
+
+            game_state["dark_alley"] = {
+                "entry_move": selected_move,
+                "entry_space": destination_id,
+                "start_space": game_state["captain_space"]
+            }
+
+            all_dark_alley = all(
+                m["destination_type"] == "dark_alley" for m in game_state["legal_moves"]
+            )
+            if all_dark_alley:
+                game_state["phase"] = "dark_alley_start"
+            else:
+                if player["coins"] < 1:
+                    game_state["dark_alley"] = {}
+                    return False
+                game_state["phase"] = "dark_alley_ask"
+            return True
 
         player = players[current]
         if player["pirates"] < selected_move["cost"]:
@@ -260,13 +276,116 @@ class ServerGameplay:
         self.score_players(game_state)
         game_state["pending_move"] = None
         self.refresh_legal_moves(game_state)
-        if not game_state["legal_moves"]:
-            self.teleport_captain(game_state)
+        
         self.resolve_space(game_state, new_space)
 
     def cancel_move(self, game_state):
         game_state["pending_move"] = None
         game_state["phase"] = "start_turn"
+
+    def pay_dark_alley(self, game_state, accepted):
+        current = game_state["active_player"]
+        player = game_state["players"][current]
+
+        if not accepted:
+            game_state["dark_alley"] = {}
+            game_state["phase"] = "start_turn"
+            return
+
+        player["coins"] -= 1
+        game_state["phase"] = "dark_alley_start"
+
+    def cancel_dark_alley(self, game_state):
+        game_state["dark_alley"] = {}
+        game_state["phase"] = "start_turn"
+
+    def resolve_dark_alley(self, game_state, exit_id):
+
+        players = game_state["players"]
+        current = game_state["active_player"]
+        player = players[current]
+        dark_alley = game_state.get("dark_alley") or {}
+
+        entry_move = dark_alley.get("entry_move")
+        entry_space = dark_alley.get("entry_space")
+        start_space = dark_alley.get("start_space")
+        if entry_move is None:
+            return False
+
+        if exit_id == entry_space:
+            return False  # must exit through a different alley
+
+        alley_lookup = game_state["alley_lookup"]
+        exit_move = alley_lookup.get(exit_id) or alley_lookup.get(str(exit_id))
+        if exit_move is None:
+            return False  # not a valid dark alley
+
+        # Occupancy check across BOTH legs — neither the entry path nor the
+        # exit path may pass through a space another player currently
+        # occupies.
+        all_relevant_spaces = set(entry_move["path"]) | set(exit_move["path"])
+        for occupied in game_state["occupied_paths"]:
+            if all_relevant_spaces.intersection(occupied["path"]):
+                return False
+
+        entry_cost = entry_move["cost"]
+        exit_cost = exit_move["cost"]
+
+        total_cost = entry_cost + exit_cost
+        if player["pirates"] < total_cost:
+            return False
+
+        player["pirates"] -= total_cost
+        player["pirates_on_board"] += total_cost
+
+        for space_id in entry_move["path"]:
+            game_state["space_lookup"][space_id]["occupant"] = player["id"]
+        for space_id in exit_move["path"]:
+            game_state["space_lookup"][space_id]["occupant"] = player["id"]
+
+        # Two separate entries — never combined — so a future reclaim can
+        # pick any two dark-alley legs independently, linked or not.
+        game_state["occupied_paths"].append({
+            "player_id": player["id"],
+            "start": start_space,
+            "destination": entry_space,
+            "path": entry_move["path"],
+            "cost": entry_cost,
+            "dark_alley": True
+        })
+        game_state["occupied_paths"].append({
+            "player_id": player["id"],
+            "start": exit_id,
+            "destination": exit_move["captain"],
+            "path": exit_move["path"],
+            "cost": exit_cost,
+            "dark_alley": True
+        })
+
+        final_space_id = exit_move["captain"]
+        old_space = game_state["space_lookup"][start_space]
+        old_space["captain"] = False
+        new_space = game_state["space_lookup"][final_space_id]
+        new_space["captain"] = True
+        game_state["captain_space"] = final_space_id
+        game_state["legal_moves"] = game_state["captain_graph"].get(final_space_id) \
+            or game_state["captain_graph"].get(str(final_space_id))
+
+        rendezvous_scored = False
+        for card in player["rendezvous"]:
+            if card["completed"]:
+                continue
+            if self.rendezvous_check(card, new_space):
+                card["completed"] = True
+                rendezvous_scored = True
+                self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
+
+        game_state["dark_alley"] = {}
+        self.score_players(game_state)
+        self.refresh_legal_moves(game_state)
+
+        self.resolve_space(game_state, new_space)
+        return True
 
     # ── Space resolution  ──────────────────────────────────────
 
@@ -661,6 +780,8 @@ class ServerGameplay:
             return False
         player["coins"] -= 1
         self.log_action(game_state, f"{player['name']} spent a coin to move again.")
+        if not game_state["legal_moves"]:
+            self.teleport_captain(game_state)
         game_state["phase"] = "start_turn"
         return True
 
@@ -700,6 +821,9 @@ class ServerGameplay:
         else:
             self.log_action(game_state, f"{players[current]['name']} avasted.")
 
+        if not game_state["legal_moves"]:
+            self.teleport_captain(game_state)
+        
         for player in players:
             self.sort_hand(player)
 

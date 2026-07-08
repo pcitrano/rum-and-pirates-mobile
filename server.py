@@ -133,14 +133,12 @@ def on_player_action(data):
         destination_id = data.get("destination_id")
         result = gameplay.move_captain(game_state, destination_id)
 
-        if result is None:
-            emit("error", {"message": "Dark alley moves aren't supported yet"})
-            return
         if result is False:
             emit("error", {"message": "Illegal move"})
             return
 
-        gameplay.confirm_move(game_state)
+        if game_state["phase"] == "confirm_move":
+            gameplay.confirm_move(game_state)
 
     elif action_type == "rest":
         gameplay.rest(game_state)
@@ -178,6 +176,19 @@ def on_player_action(data):
 
     elif action_type == "answer_pub_invite":
         gameplay.answer_pub_invite(game_state, data.get("joined", False))
+
+    elif action_type == "pay_dark_alley":
+        gameplay.pay_dark_alley(game_state, data.get("accepted", False))
+
+    elif action_type == "cancel_dark_alley":
+        gameplay.cancel_dark_alley(game_state)
+
+    elif action_type == "resolve_dark_alley":
+        exit_id = data.get("exit_id")
+        result = gameplay.resolve_dark_alley(game_state, exit_id)
+        if result is False:
+            emit("error", {"message": "Can't exit through that alley"})
+            return
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)

@@ -594,6 +594,7 @@ canvas.addEventListener("pointerup", e => {
   if (dx < 8 && dy < 8) handleBoardTap(e.clientX, e.clientY);
   isPanning = false;
 });
+
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.1 : 0.9;
@@ -640,11 +641,29 @@ canvas.addEventListener("touchend", e => {
 // ── Board tap handling ────────────────────────────────────────────────────────
 function handleBoardTap(clientX, clientY) {
   if (!gameState || gameState.active_player !== myPlayerIndex) return;
-  if (gameState.phase !== "start_turn" && gameState.phase !== "choose_action") return;
 
   const rect = canvas.getBoundingClientRect();
   const bx = (clientX - rect.left - offsetX) / scale;
   const by = (clientY - rect.top - offsetY) / scale;
+
+  if (gameState.phase === "dark_alley_start") {
+    const entranceId = (gameState.dark_alley || {}).entry_space;
+    for (const [idStr, exitMove] of Object.entries(gameState.alley_lookup || {})) {
+      const exitId = parseInt(idStr);
+      if (exitId === entranceId) continue;
+      const boardSpace = spaceLoookup[exitId];
+      if (!boardSpace || !boardSpace.hitbox_radius) continue;
+      const dx = bx - boardSpace.board_x, dy = by - boardSpace.board_y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < boardSpace.hitbox_radius) {
+        promptDarkAlleyExit(exitId, exitMove);
+        return;
+      }
+    }
+    return;
+  }
+
+  if (gameState.phase !== "start_turn" && gameState.phase !== "choose_action") return;
 
   const legalMoves = gameState.legal_moves || [];
 
@@ -658,6 +677,39 @@ function handleBoardTap(clientX, clientY) {
       return;
     }
   }
+}
+
+function promptDarkAlleyExit(exitId, exitMove) {
+  const container = document.getElementById("action-buttons");
+  const entryMove = (gameState.dark_alley || {}).entry_move || { cost: 0 };
+  const myPlayer = gameState.players[myPlayerIndex];
+  const totalCost = entryCost + exitMove.cost;
+
+  container.innerHTML = `
+    <p style="color:var(--parchment);margin-bottom:12px;">
+      Exit here for <strong style="color:var(--gold-light)">${totalCost} pirate${totalCost !== 1 ? 's' : ''}</strong> total
+      (${entryCost} in, ${exitMove.cost} out)?
+    </p>
+  `;
+  const confirmBtn = document.createElement("button");
+  confirmBtn.className = "action-btn";
+  confirmBtn.textContent = "✓ Confirm Exit";
+  confirmBtn.onclick = () => {
+    socket.emit("player_action", {
+      room_id: myRoomId,
+      type: "resolve_dark_alley",
+      exit_id: exitId,
+      player_index: myPlayerIndex
+    });
+    closeActionPanel();
+  };
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "action-btn secondary";
+  cancelBtn.textContent = "✕ Choose a different alley";
+  cancelBtn.onclick = closeActionPanel;
+  container.appendChild(confirmBtn);
+  container.appendChild(cancelBtn);
+  document.getElementById("action-panel").classList.add("open");
 }
 
 function promptMove(move) {
@@ -912,6 +964,8 @@ function buildActionButtons() {
   if (!gameState || gameState.phase === "character_select") return;
   const phase = gameState.phase;
 
+  // Roll phases can apply to a player other than active_player (e.g. a
+  // scorpion contest passes the roll around the table).
   if (phase === "roll_start") {
     if (gameState.next_roller === myPlayerIndex) {
       addActionBtn(container, "🎲 Roll the Die", "", () => {
@@ -936,6 +990,8 @@ function buildActionButtons() {
     return;
   }
 
+  // Pub invites go around the table to whoever is currently being asked,
+  // not necessarily the active player.
   if (phase === "pub_invite") {
     const pub = gameState.pub;
     const askedIndex = pub ? pub.current_ask : null;
@@ -959,6 +1015,33 @@ function buildActionButtons() {
     return;
   }
 
+  if (phase === "dark_alley_ask") {
+    const myCoins = gameState.players[myPlayerIndex].coins;
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+    label.textContent = "Slip into the dark alley for 1 coin?";
+    container.appendChild(label);
+    addActionBtn(container, myCoins > 0 ? "Pay 1 Coin" : "No coins left", "", () => {
+      if (myCoins <= 0) return;
+      socket.emit("player_action", { room_id: myRoomId, type: "pay_dark_alley", accepted: true, player_index: myPlayerIndex });
+    });
+    addActionBtn(container, "Cancel Move", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "pay_dark_alley", accepted: false, player_index: myPlayerIndex });
+    });
+    return;
+  }
+
+  if (phase === "dark_alley_start") {
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+    label.textContent = "Tap any other dark alley on the board to exit through.";
+    container.appendChild(label);
+    addActionBtn(container, "Cancel Move", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "cancel_dark_alley", player_index: myPlayerIndex });
+    });
+    return;
+  }
+
   if (gameState.active_player !== myPlayerIndex) {
     container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
     return;
@@ -974,7 +1057,6 @@ function buildActionButtons() {
       closeActionPanel();
     });
     addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
-  
   } else if (phase === "rendezvous_card") {
     const card = gameState.rendezvous;
     if (card) {
@@ -992,7 +1074,6 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "confirm_rendezvous", player_index: myPlayerIndex });
       closeActionPanel();
     });
-  
   } else if (phase === "supply_card") {
     const card = gameState.supply;
     if (card) {
@@ -1014,7 +1095,6 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "supply_choice", keep_card: false, player_index: myPlayerIndex });
       closeActionPanel();
     });
-  
   } else if (phase === "har_supply") {
     const cardA = gameState.supply;
     const cardB = gameState.har_supply;
@@ -1051,7 +1131,6 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "har_supply_choice", chosen_index: null, player_index: myPlayerIndex });
       closeActionPanel();
     });
-  
   } else if (phase === "post_move") {
     const myPlayer = gameState.players[myPlayerIndex];
     const canMoveAgain = myPlayer && myPlayer.coins > 0;
@@ -1201,6 +1280,11 @@ function connectToGame(name, roomId, playerIndex) {
       Object.entries(gameState.captain_graph).forEach(([k, v]) => { fixed[parseInt(k)] = v; });
       gameState.captain_graph = fixed;
     }
+    if (gameState.alley_lookup) {
+      const fixed = {};
+      Object.entries(gameState.alley_lookup).forEach(([k, v]) => { fixed[parseInt(k)] = v; });
+      gameState.alley_lookup = fixed;
+    }
 
     if (gameState && gameState.board_seed && boardSpaces.length === 0) {
       setLoading("Building board...");
@@ -1231,6 +1315,9 @@ function connectToGame(name, roomId, playerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
     if (gameState.phase === "pub_invite" && gameState.pub && gameState.pub.current_ask === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
+    }
+    if ((gameState.phase === "dark_alley_ask" || gameState.phase === "dark_alley_start") && gameState.active_player === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
 

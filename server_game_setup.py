@@ -322,7 +322,7 @@ class ServerGameSetup:
             {"name": "Captain Sullivan the Scorpion Tamer", "image": "char_sullivan.png"},
             {"name": "Captain Har the Hoarder", "image": "char_har.png"},
             {"name": "Captain Nought the Night Owl", "image": "char_nought.png"},
-            {"name": "Captain Argh the Alley Bandit", "image": "char_argh.png"},
+            #{"name": "Captain Argh the Alley Bandit", "image": "char_argh.png"},
             {"name": "Captain Fergus the Fighter", "image": "char_fergus.png"},
             {"name": "Captain Midas the Master of Coin", "image": "char_midas.png"},
         ]
@@ -403,6 +403,7 @@ class ServerGameSetup:
             "alley_lookup": {},
             "coin_lookup": {},
             "pending_move": None,
+            "dark_alley": {},
             "occupied_paths": [],
             "reclaim_1": None,
             "reclaim_2": None,
