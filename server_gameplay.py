@@ -276,7 +276,7 @@ class ServerGameplay:
         self.score_players(game_state)
         game_state["pending_move"] = None
         self.refresh_legal_moves(game_state)
-        
+        game_state["phase"] = "post_move"
         self.resolve_space(game_state, new_space)
 
     def cancel_move(self, game_state):
@@ -540,10 +540,8 @@ class ServerGameplay:
         if is_har and game_state["decks"]["supplies"]:
             game_state["har_supply"] = game_state["decks"]["supplies"].pop()
             game_state["phase"] = "har_supply"
-            return
         else:
             game_state["phase"] = "supply_card"
-            return
 
     def resolve_supply_choice(self, game_state, keep_card):
         player = game_state["players"][game_state["active_player"]]
