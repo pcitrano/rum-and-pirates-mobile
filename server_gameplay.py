@@ -393,9 +393,9 @@ class ServerGameplay:
         game_state["dark_alley"] = {}
         self.score_players(game_state)
         self.refresh_legal_moves(game_state)
+        game_state["phase"] = "post_move"
 
-        self.resolve_space(game_state, new_space)
-        return True
+        return self.resolve_space(game_state, new_space)
 
     # ── Space resolution  ──────────────────────────────────────
 
