@@ -276,7 +276,6 @@ class ServerGameplay:
         self.score_players(game_state)
         game_state["pending_move"] = None
         self.refresh_legal_moves(game_state)
-        game_state["phase"] = "post_move"
         self.resolve_space(game_state, new_space)
 
     def cancel_move(self, game_state):
@@ -529,7 +528,7 @@ class ServerGameplay:
             game_state["scorpion_contest"]["player_index"] = next_player
             self.roll_start(game_state, next_player)
 
-    def supply_space(self, game_state, player):
+    def supply_space(self, game_state):
         if not game_state["decks"]["supplies"]:
             game_state["phase"] = "post_move"
             return
