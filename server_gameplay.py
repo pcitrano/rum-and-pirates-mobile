@@ -408,10 +408,10 @@ class ServerGameplay:
         elif space["type"] == "rendezvous":
             self.log_action(game_state, f"{player['name']} set a hot date with a wench.")
             return self.rendezvous_space(game_state)
+        elif space["type"] in ("red_pub", "blue_pub", "green_pub"):
+            color = space["type"].replace("_pub", "")
+            return self.pub_space(game_state, player, color)
         else:
-            # Not yet migrated (pubs, maps, guards, supply, rendezvous,
-            # treasure, scorpion, start/reclaim). Log it and let the turn
-            # continue rather than getting stuck.
             self.log_action(game_state, f"{player['name']} landed on a {space['type']} space (not yet handled server-side).")
             game_state["phase"] = "post_move"
 

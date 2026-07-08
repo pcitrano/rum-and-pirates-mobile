@@ -478,8 +478,8 @@ function buildBoardFromSeed(seed) {
     const isNormal = s.type === "normal" || s.type === "edge";
     const isDark = s.type === "dark_alley";
     s.captain_space = !isNormal && !isDark;
-    s.clickable = !isNormal && !isDark;
-    s.required_pirates = (isNormal || isDark) ? 1 : 0;
+    s.clickable = !isNormal;
+    s.required_pirates = (isNormal || isDark) ? 1 : 1;
     s.hitbox_radius = s.clickable ? (s.type === "edge" ? 0.04 * TILE_SIZE : 0.07 * TILE_SIZE) : 0;
   });
 
