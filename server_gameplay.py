@@ -418,6 +418,8 @@ class ServerGameplay:
             return self.pub_space(game_state, player, color)
         elif space["type"] == "guard":
             return self.guard_space(game_state)
+        elif space["type"] == "start":
+            return self.reclaim_pirates(game_state)
         else:
             self.log_action(game_state, f"{player['name']} landed on a {space['type']} space (not yet handled server-side).")
             game_state["phase"] = "post_move"

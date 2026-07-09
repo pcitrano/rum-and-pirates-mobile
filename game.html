@@ -51,7 +51,7 @@
     color: var(--rope);
     font-style: italic;
   }
-  #menu-toggle {
+  .topbar-btn {
     background: none;
     border: 1px solid var(--wood-light);
     border-radius: 3px;
@@ -316,7 +316,8 @@
       <div class="round-info" id="round-display">Round —</div>
       <div class="room-info" id="room-display">Room: —</div>
     </div>
-    <button id="menu-toggle" onclick="toggleActionPanel()">☰ Actions</button>
+    <button class="topbar-btn" onclick="toggleLog()">📜 Log</button>
+    <button class="topbar-btn" onclick="toggleActionPanel()">☰ Actions</button>
   </div>
 
   <!-- Board + Tableau -->
@@ -1070,9 +1071,8 @@ function buildActionButtons() {
   }
 
   if (gameState.active_player !== myPlayerIndex) {
-    /*container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
-    return;*/ 
-    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+    container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
+    return; 
   }
 
   if (phase === "guard_start") {
@@ -1146,7 +1146,6 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "rest", player_index: myPlayerIndex });
       closeActionPanel();
     });
-    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
   } else if (phase === "rendezvous_card") {
     const card = gameState.rendezvous;
     if (card) {
@@ -1233,7 +1232,6 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "avast", player_index: myPlayerIndex });
       closeActionPanel();
     });
-    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
   }
 }
 
