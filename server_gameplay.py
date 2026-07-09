@@ -802,6 +802,110 @@ class ServerGameplay:
         game_state["fergus_guard_roll"] = None
         game_state["phase"] = "post_move"
 
+    # ----- Reclaim Pirates -----
+    def reclaim_pirates(self, game_state):
+        game_state["phase"] = "reclaim_1"
+        game_state["reclaim_1"] = None
+        game_state["reclaim_2"] = None
+
+    def try_reclaim_1(self, game_state, space_id):
+        player = game_state["players"][game_state["active_player"]]
+        space = game_state["space_lookup"].get(space_id)
+        if space is None:
+            return False
+        is_dark = space["type"] == "dark_alley"
+
+        for i, path in enumerate(game_state["occupied_paths"]):
+            if path["player_id"] != player["id"]:
+                continue
+            if bool(path.get("dark_alley", False)) != is_dark:
+                continue
+            if path["start"] == space_id or path["destination"] == space_id:
+                game_state["reclaim_1"] = {
+                    "space_id": space_id,
+                    "is_dark_alley": is_dark,
+                    "path_index": i
+                }
+                game_state["phase"] = "reclaim_2"
+                return True
+        return False
+    
+    def try_reclaim_2(self, game_state, space_id):
+        reclaim_1 = game_state.get("reclaim_1")
+        if reclaim_1 is None:
+            return False
+
+        player = game_state["players"][game_state["active_player"]]
+        space = game_state["space_lookup"].get(space_id)
+        if space is None:
+            return False
+        is_dark = space["type"] == "dark_alley"
+
+        if is_dark != reclaim_1["is_dark_alley"]:
+            game_state["phase"] = "reclaim_fail"
+            return False
+
+        if is_dark:
+            # A second dark-alley leg — entrance or exit, does NOT need to
+            # be linked to the first one at all.
+            for i, path in enumerate(game_state["occupied_paths"]):
+                if i == reclaim_1["path_index"]:
+                    continue
+                if path["player_id"] != player["id"] or not path.get("dark_alley", False):
+                    continue
+                if path["start"] == space_id or path["destination"] == space_id:
+                    game_state["reclaim_2"] = {"space_id": space_id, "path_index": i}
+                    return self.resolve_reclaim(game_state)
+            game_state["phase"] = "reclaim_fail"
+            return False
+        else:
+            # Must be the OTHER endpoint of the SAME connected path.
+            path = game_state["occupied_paths"][reclaim_1["path_index"]]
+            if space_id != reclaim_1["space_id"] and (path["start"] == space_id or path["destination"] == space_id):
+                game_state["reclaim_2"] = {"space_id": space_id, "path_index": reclaim_1["path_index"]}
+                return self.resolve_reclaim(game_state)
+            game_state["phase"] = "reclaim_fail"
+            return False
+
+    def resolve_reclaim(self, game_state):
+        player = game_state["players"][game_state["active_player"]]
+        reclaim_1 = game_state["reclaim_1"]
+        reclaim_2 = game_state["reclaim_2"]
+
+        # Dedupe in case both selections landed on the same linked path
+        # (the normal, non-dark-alley case). Removing highest index first
+        # keeps the lower index valid.
+        indices = sorted({reclaim_1["path_index"], reclaim_2["path_index"]}, reverse=True)
+
+        total_refund = 0
+        for idx in indices:
+            path = game_state["occupied_paths"][idx]
+            total_refund += path["cost"]
+            for space_id in path["path"]:
+                sp = game_state["space_lookup"].get(space_id)
+                if sp:
+                    sp["occupant"] = None
+            game_state["occupied_paths"].pop(idx)
+
+        player["pirates"] += total_refund
+        self.log_action(game_state, f"{player['name']} reclaimed {total_refund} pirate{'s' if total_refund != 1 else ''}.")
+
+        game_state["reclaim_1"] = None
+        game_state["reclaim_2"] = None
+        game_state["phase"] = "post_move"
+        self.refresh_legal_moves(game_state)
+        return True
+
+    def resolve_reclaim_fail(self, game_state):
+        game_state["reclaim_1"] = None
+        game_state["reclaim_2"] = None
+        game_state["phase"] = "post_move"
+
+    def skip_reclaim(self, game_state):
+        game_state["reclaim_1"] = None
+        game_state["reclaim_2"] = None
+        game_state["phase"] = "post_move"
+
     # ── Dice Rolling ────────────────────────────────────────────────────────
     def roll_start(self, game_state, player_index):
         game_state["next_roller"] = player_index

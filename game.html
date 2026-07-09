@@ -663,6 +663,26 @@ function handleBoardTap(clientX, clientY) {
     return;
   }
 
+  if (gameState.phase === "reclaim_1" || gameState.phase === "reclaim_2") {
+    // Any captain_space or dark_alley space is a valid tap target — the
+    // server decides whether it's actually a legal reclaim endpoint.
+    for (const [idStr, boardSpace] of Object.entries(spaceLoookup)) {
+      if (!boardSpace.hitbox_radius) continue;
+      const dx = bx - boardSpace.board_x, dy = by - boardSpace.board_y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < boardSpace.hitbox_radius) {
+        socket.emit("player_action", {
+          room_id: myRoomId,
+          type: "select_reclaim",
+          space_id: parseInt(idStr),
+          player_index: myPlayerIndex
+        });
+        return;
+      }
+    }
+    return;
+  }
+
   if (gameState.phase !== "start_turn" && gameState.phase !== "choose_action") return;
 
   const legalMoves = gameState.legal_moves || [];
@@ -1049,6 +1069,12 @@ function buildActionButtons() {
     return;
   }
 
+  if (gameState.active_player !== myPlayerIndex) {
+    /*container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
+    return;*/ 
+    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
+  }
+
   if (phase === "guard_start") {
     const label = document.createElement("p");
     label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
@@ -1085,8 +1111,29 @@ function buildActionButtons() {
     return;
   }
 
-  if (gameState.active_player !== myPlayerIndex) {
-    container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
+  if (phase === "reclaim_1" || phase === "reclaim_2") {
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+    label.textContent = phase === "reclaim_1"
+      ? "Tap the first space to reclaim pirates from."
+      : "Now tap a second space to complete the reclaim.";
+    container.appendChild(label);
+    addActionBtn(container, "Skip Reclaim", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "skip_reclaim", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
+    return;
+  }
+
+  if (phase === "reclaim_fail") {
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--red); margin-bottom:12px;";
+    label.textContent = "Those spaces don't connect — no pirates reclaimed.";
+    container.appendChild(label);
+    addActionBtn(container, "Continue", "", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "acknowledge_reclaim_fail", player_index: myPlayerIndex });
+      closeActionPanel();
+    });
     return;
   }
 
@@ -1361,6 +1408,12 @@ function connectToGame(name, roomId, playerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
     if ((gameState.phase === "dark_alley_ask" || gameState.phase === "dark_alley_start") && gameState.active_player === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
+    }
+    if ((gameState.phase === "guard_start" || gameState.phase === "guard_battle") && gameState.active_player === myPlayerIndex) {
+      document.getElementById("action-panel").classList.add("open");
+    }
+    if ((gameState.phase === "reclaim_1" || gameState.phase === "reclaim_2" || gameState.phase === "reclaim_fail") && gameState.active_player === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
 

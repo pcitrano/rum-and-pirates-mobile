@@ -196,6 +196,24 @@ def on_player_action(data):
     elif action_type == "fight_guard":
         gameplay.resolve_guard(game_state)
 
+    elif action_type == "select_reclaim":
+        space_id = data.get("space_id")
+        if game_state["phase"] == "reclaim_1":
+            success = gameplay.try_reclaim_1(game_state, space_id)
+            if not success:
+                emit("error", {"message": "That space isn't one of your occupied paths."})
+                return
+        elif game_state["phase"] == "reclaim_2":
+            success = gameplay.try_reclaim_2(game_state, space_id)
+            if not success and game_state["phase"] != "reclaim_fail":
+                emit("error", {"message": "That doesn't complete a valid reclaim."})
+                return
+
+    elif action_type == "acknowledge_reclaim_fail":
+        gameplay.resolve_reclaim_fail(game_state)
+
+    elif action_type == "skip_reclaim":
+        gameplay.skip_reclaim(game_state)
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)
