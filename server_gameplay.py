@@ -5,12 +5,10 @@ class ServerGameplay:
         pass
 
     # ── Logging ──────────────────────────────────────────────────────────
-
     def log_action(self, game_state, text):
         game_state["action_log"].append(text)
 
     # ── Player helpers ──────────────────────────────────────────────────
-
     def player_can_act(self, player):
         return player["board_position"] == 0 and player["pirates"] > 0
 
@@ -33,7 +31,6 @@ class ServerGameplay:
         return player
 
     # ── Scoring ──────────────────────────────────────────────────────────
-
     def score_maps(self, maps, character=None):
         total = 0
         by_color = {}
@@ -120,7 +117,6 @@ class ServerGameplay:
             }
 
     # ── Movement helpers ─────────────────────────────────────────────────
-
     def get_legal_moves_from_space(self, game_state, captain_space_id):
         occupied_spaces = set()
         for occupied_path in game_state["occupied_paths"]:
@@ -179,7 +175,6 @@ class ServerGameplay:
         return game_state
 
     # ── Core movement ────────────────────────────────────────────────────
-
     def move_captain(self, game_state, destination_id):
 
         players = game_state["players"]
@@ -397,7 +392,6 @@ class ServerGameplay:
         return self.resolve_space(game_state, new_space)
 
     # ── Space resolution  ──────────────────────────────────────
-
     def resolve_space(self, game_state, space):
         player = game_state["players"][game_state["active_player"]]
 
@@ -422,6 +416,8 @@ class ServerGameplay:
         elif space["type"] in ("red_pub", "blue_pub", "green_pub"):
             color = space["type"].replace("_pub", "")
             return self.pub_space(game_state, player, color)
+        elif space["type"] == "guard":
+            return self.guard_space(game_state)
         else:
             self.log_action(game_state, f"{player['name']} landed on a {space['type']} space (not yet handled server-side).")
             game_state["phase"] = "post_move"
@@ -470,6 +466,7 @@ class ServerGameplay:
         game_state["phase"] = "post_move"
         self.score_players(game_state)
 
+    # ----- Rendezvous -----
     def rendezvous_space(self, game_state):
         if not game_state["decks"]["rendezvous"]:
             game_state["phase"] = "post_move"
@@ -486,6 +483,7 @@ class ServerGameplay:
         game_state["phase"] = "post_move"
         self.score_players(game_state)
 
+    # ----- Treasure -----
     def treasure_space(self, game_state):
         player = game_state["players"][game_state["active_player"]]
         card = game_state["tableau"]["treasure"]
@@ -528,6 +526,7 @@ class ServerGameplay:
             game_state["scorpion_contest"]["player_index"] = next_player
             self.roll_start(game_state, next_player)
 
+    # ----- Supply -----
     def supply_space(self, game_state, player):
         if not game_state["decks"]["supplies"]:
             game_state["phase"] = "post_move"
@@ -582,6 +581,7 @@ class ServerGameplay:
         game_state["phase"] = "post_move"
         self.score_players(game_state)
 
+    # ----- Pubs -----
     def pub_space(self, game_state, player, color):
         active_player = game_state["active_player"]
         is_duncan = player["character"] is not None and player["character"]["name"] == "Captain Duncan the Drunken"
@@ -725,6 +725,83 @@ class ServerGameplay:
             game_state["pub"]["pub_active"] = False
             self.score_players(game_state)
 
+    # ----- Guards -----
+    def guard_space(self, game_state):
+        game_state["phase"] = "guard_start"
+        self.score_players(game_state)
+
+    def choose_guard(self, game_state, guard_size):
+        if guard_size == "large":
+            if not game_state["decks"]["large_guard"]:
+                game_state["phase"] = "post_move"
+                return
+            game_state["guard"] = game_state["decks"]["large_guard"].pop()
+        else:
+            if not game_state["decks"]["small_guard"]:
+                game_state["phase"] = "post_move"
+                return
+            game_state["guard"] = game_state["decks"]["small_guard"].pop()
+
+        game_state["phase"] = "guard_battle"
+
+    def resolve_guard(self, game_state):
+        player = game_state["players"][game_state["active_player"]]
+        card = game_state["guard"]
+        category = "large_guard" if card["points"] > 3 else "small_guard"
+
+        if player["pirates"] > card["points"] and card.get("coin_bonus", 0) > 0:
+            self.log_action(game_state, f"{player['name']} defeated the guard for {card['points']} points and secured a coin.")
+            player[category].append(card)
+            player["coins"] += 1
+        elif player["pirates"] > card["points"]:
+            self.log_action(game_state, f"{player['name']} defeated the guard for {card['points']} points.")
+            player[category].append(card)
+        else:
+            self.log_action(game_state, f"The guard made {player['name']} their bitch!")
+            game_state["decks"][category].insert(0, card)
+
+        game_state["guard"] = None
+        self.score_players(game_state)
+
+        # Fergus the Fighter — any other player at the table gets a chance
+        # to intimidate the same guard for a copy of the card.
+        fergus_index = next(
+            (i for i, p in enumerate(game_state["players"])
+             if p["character"] is not None
+             and p["character"]["name"] == "Captain Fergus the Fighter"
+             and i != game_state["active_player"]),
+            None
+        )
+
+        if fergus_index is not None:
+            game_state["fergus_guard_roll"] = {
+                "fergus_index": fergus_index,
+                "guard_points": card["points"],
+                "category": category,
+                "card": card.copy()
+            }
+            self.roll_start(game_state, fergus_index)
+        else:
+            game_state["phase"] = "post_move"
+
+    def resolve_fergus_roll(self, game_state):
+        roll_data = game_state.get("fergus_guard_roll", {})
+        fergus_index = roll_data["fergus_index"]
+        fergus = game_state["players"][fergus_index]
+        roll = game_state["current_roll"]["roll"]
+        card = roll_data["card"]
+        category = roll_data["category"]
+
+        if roll >= roll_data["guard_points"]:
+            self.log_action(game_state, f"{fergus['name']} intimidated the guard and also claimed {card['points']} points!")
+            fergus[category].append(card)
+            self.score_players(game_state)
+        else:
+            self.log_action(game_state, f"{fergus['name']} failed to intimidate the guard.")
+
+        game_state["fergus_guard_roll"] = None
+        game_state["phase"] = "post_move"
+
     # ── Dice Rolling ────────────────────────────────────────────────────────
     def roll_start(self, game_state, player_index):
         game_state["next_roller"] = player_index
@@ -777,15 +854,13 @@ class ServerGameplay:
         if game_state.get("wrangle", {}).get("active"):
             return  # not yet migrated
         if game_state.get("fergus_guard_roll") is not None:
-            return  # not yet migrated
+            return self.resolve_fergus_roll(game_state)
         if space_type == "treasure":
             return self.resolve_scorpion(game_state)
         if space_type in ("blue_pub", "green_pub", "red_pub"):
             return self.resolve_pub(game_state)
-        # pubs and other roll types aren't migrated yet
 
     # ── Turn flow ────────────────────────────────────────────────────────
-
     def move_again(self, game_state):
         current = game_state["active_player"]
         player = game_state["players"][current]

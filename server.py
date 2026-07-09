@@ -190,6 +190,13 @@ def on_player_action(data):
             emit("error", {"message": "Can't exit through that alley"})
             return
 
+    elif action_type == "choose_guard":
+        gameplay.choose_guard(game_state, data.get("guard_size"))
+ 
+    elif action_type == "fight_guard":
+        gameplay.resolve_guard(game_state)
+
+
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)
         emit("action_received", data, room=room_id, include_self=False)

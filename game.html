@@ -805,12 +805,14 @@ function renderContestOverlay() {
   const overlay = document.getElementById("contest-overlay");
   const contest = gameState.scorpion_contest;
   const pub = gameState.pub;
+  const fergusRoll = gameState.fergus_guard_roll;
   const rollPhases = ["roll_start", "roll_no_barrels", "roll_with_barrels", "roll_with_rerolls"];
 
   const scorpionActive = contest && contest.contest_active && rollPhases.includes(gameState.phase);
   const pubActive = pub && pub.pub_active && rollPhases.includes(gameState.phase);
+  const fergusActive = fergusRoll != null && rollPhases.includes(gameState.phase);
 
-  if (!scorpionActive && !pubActive) {
+  if (!scorpionActive && !pubActive && !fergusActive) {
     overlay.style.display = "none";
     return;
   }
@@ -825,6 +827,10 @@ function renderContestOverlay() {
     document.getElementById("contest-turn-label").textContent = `🦂 ${rollerName}'s roll`;
     document.getElementById("contest-progress-label").innerHTML =
       `<strong>${contest.total}</strong> / ${contest.target} to get stung`;
+  } else if (fergusActive) {
+    document.getElementById("contest-turn-label").textContent = `⚔️ ${rollerName} moves in!`;
+    document.getElementById("contest-progress-label").innerHTML =
+      `Needs <strong>${fergusRoll.guard_points}</strong> or higher to steal the guard`;
   } else {
     const participantNames = pub.participants.map(i => (gameState.players[i] || {}).name || "?").join(", ");
     document.getElementById("contest-turn-label").textContent = `🍺 ${rollerName}'s roll`;
@@ -1039,6 +1045,42 @@ function buildActionButtons() {
     container.appendChild(label);
     addActionBtn(container, "Cancel Move", "secondary", () => {
       socket.emit("player_action", { room_id: myRoomId, type: "cancel_dark_alley", player_index: myPlayerIndex });
+    });
+    return;
+  }
+
+  if (phase === "guard_start") {
+    const label = document.createElement("p");
+    label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+    label.textContent = "Which guard will you challenge?";
+    container.appendChild(label);
+    addActionBtn(container, "Small Guard", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "choose_guard", guard_size: "small", player_index: myPlayerIndex });
+    });
+    addActionBtn(container, "Large Guard", "secondary", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "choose_guard", guard_size: "large", player_index: myPlayerIndex });
+    });
+    return;
+  }
+
+  if (phase === "guard_battle") {
+    const card = gameState.guard;
+    if (card) {
+      const isLarge = card.points > 3;
+      const img = document.createElement("img");
+      img.src = `${SERVER}/assets/guards/${card.image_file}`;
+      img.style.cssText = "width:140px; display:block; margin:0 auto 10px; border-radius:6px; border:2px solid var(--gold);";
+      container.appendChild(img);
+
+      const label = document.createElement("p");
+      label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:12px;";
+      const myPirates = gameState.players[myPlayerIndex].pirates;
+      label.innerHTML = `Guard strength: <strong style="color:var(--gold-light)">${card.points}</strong> — you have <strong style="color:var(--gold-light)">${myPirates}</strong> pirates`;
+      container.appendChild(label);
+    }
+    addActionBtn(container, "Fight!", "", () => {
+      socket.emit("player_action", { room_id: myRoomId, type: "fight_guard", player_index: myPlayerIndex });
+      closeActionPanel();
     });
     return;
   }
