@@ -88,9 +88,9 @@
     top: 10px; left: 50%;
     transform: translateX(-50%);
     background: rgba(13,27,42,0.92);
-    border: 2px solid var(--gold);
-    border-radius: 8px;
-    padding: 8px 16px;
+    border: 3px solid var(--gold);
+    border-radius: 14px;
+    padding: 16px 32px;
     z-index: 15;
     text-align: center;
     display: none;
@@ -99,15 +99,130 @@
   #contest-overlay .contest-turn {
     font-family: 'Pirata One', cursive;
     color: var(--gold-light);
-    font-size: 1rem;
+    font-size: 2rem;
   }
   #contest-overlay .contest-progress {
     color: var(--parchment);
-    font-size: 0.85rem;
-    margin-top: 2px;
+    font-size: 1.5rem;
+    margin-top: 4px;
   }
   #contest-overlay .contest-progress strong {
     color: var(--gold-light);
+  }
+
+  /* ── Wrangle screen ── */
+  #wrangle-screen {
+    position: fixed;
+    inset: 0;
+    background: #d9bd8c;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    z-index: 55;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  #wrangle-screen.open { display: flex; }
+  .wrangle-mast-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 10px;
+  }
+  .wrangle-mast-wrap img {
+    width: 100%;
+    display: block;
+  }
+  .wrangle-columns {
+    display: flex;
+    justify-content: center;
+    gap: 70px;
+    font-family: 'Pirata One', cursive;
+    color: var(--ink);
+    font-size: 1.6rem;
+    margin-bottom: 6px;
+  }
+  .wrangle-rows {
+    width: 100%;
+    max-width: 420px;
+  }
+  .wrangle-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .wrangle-name {
+    font-family: 'Pirata One', cursive;
+    font-size: 1.3rem;
+    color: var(--ink);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .wrangle-dots {
+    display: flex;
+    flex: 1;
+    justify-content: space-around;
+  }
+  .wrangle-dot-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 45%;
+  }
+  .wrangle-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,0,0,0.3);
+  }
+  .wrangle-status {
+    font-family: 'Pirata One', cursive;
+    color: var(--ink);
+    font-size: 1.3rem;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .wrangle-status p { margin-bottom: 8px; }
+
+  /* ── Inventory overlay ── */
+  #inventory-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,27,42,0.97);
+    display: none;
+    flex-direction: column;
+    z-index: 65;
+    padding: 14px;
+  }
+  #inventory-overlay.open { display: flex; }
+  #inventory-overlay h3 {
+    font-family: 'Pirata One', cursive;
+    color: var(--gold-light);
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  #inventory-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .inv-group-label {
+    font-family: 'Pirata One', cursive;
+    color: var(--gold-light);
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+  .inv-cards {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .inv-card {
+    width: 60px;
+    border-radius: 4px;
+    border: 1px solid var(--wood-light);
   }
 
   /* ── Tableau side panel ── */
@@ -183,7 +298,7 @@
     padding: 16px;
     transform: translateY(100%);
     transition: transform 0.3s ease;
-    z-index: 20;
+    z-index: 70;
     max-height: 60vh;
     overflow-y: auto;
   }
@@ -316,8 +431,11 @@
       <div class="round-info" id="round-display">Round —</div>
       <div class="room-info" id="room-display">Room: —</div>
     </div>
-    <button class="topbar-btn" onclick="toggleLog()">📜 Log</button>
-    <button class="topbar-btn" onclick="toggleActionPanel()">☰ Actions</button>
+    <div style="display:flex; gap:8px;">
+      <button class="topbar-btn" onclick="toggleLog()">📜 Log</button>
+      <button class="topbar-btn" onclick="toggleInventory()">🎒 Inventory</button>
+      <button class="topbar-btn" onclick="toggleActionPanel()">☰ Actions</button>
+    </div>
   </div>
 
   <!-- Board + Tableau -->
@@ -348,6 +466,16 @@
   <h3>📜 Action Log</h3>
   <div id="log-list"></div>
   <button id="log-close" onclick="toggleLog()">Close</button>
+</div>
+
+<!-- Wrangle screen -->
+<div id="wrangle-screen"></div>
+
+<!-- Inventory overlay -->
+<div id="inventory-overlay">
+  <h3>🎒 Your Inventory</h3>
+  <div id="inventory-content"></div>
+  <button id="log-close" onclick="toggleInventory()">Close</button>
 </div>
 
 <!-- Toast -->
@@ -479,8 +607,8 @@ function buildBoardFromSeed(seed) {
     const isNormal = s.type === "normal" || s.type === "edge";
     const isDark = s.type === "dark_alley";
     s.captain_space = !isNormal && !isDark;
-    s.clickable = !isNormal;
-    s.required_pirates = (isNormal || isDark) ? 1 : 1;
+    s.clickable = !isNormal;  // dark alleys ARE clickable, only normal/edge aren't
+    s.required_pirates = (isNormal || isDark) ? 1 : 0;
     s.hitbox_radius = s.clickable ? (s.type === "edge" ? 0.04 * TILE_SIZE : 0.07 * TILE_SIZE) : 0;
   });
 
@@ -873,6 +1001,59 @@ function renderContestOverlay() {
   overlay.style.display = "block";
 }
 
+// ── Wrangle screen ────────────────────────────────────────────────────────────
+function renderWrangleScreen() {
+  const screen = document.getElementById("wrangle-screen");
+  screen.classList.add("open");
+
+  const wrangle = gameState.wrangle;
+  const players = (gameState.players || []).slice().sort((a, b) => a.board_position - b.board_position);
+
+  const rollerIndex = gameState.phase === "roll_start"
+    ? gameState.next_roller
+    : (gameState.current_roll || {}).player;
+  const rollerName = (gameState.players[rollerIndex] || {}).name || "—";
+
+  let leaderHtml = "No one has rolled yet";
+  if (wrangle.leader !== null && wrangle.leader !== undefined) {
+    const leaderName = (gameState.players[wrangle.leader] || {}).name || "?";
+    leaderHtml = `${leaderName} (rolled ${wrangle.leader_roll})`;
+  }
+
+  screen.innerHTML = `
+    <div class="wrangle-mast-wrap">
+      <img src="${SERVER}/assets/wrangle/Wrangle.png" onerror="this.style.display='none'">
+    </div>
+    <div class="wrangle-columns">
+      <span>Active</span>
+      <span>Safe</span>
+    </div>
+    <div class="wrangle-rows">
+      ${players.map(p => {
+        const c = p.color;
+        const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#333');
+        const activeDots = Array(p.wrangle_pirates || 0).fill(0)
+          .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
+        const safeDots = Array(p.safe_pirates || 0).fill(0)
+          .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
+        return `
+          <div class="wrangle-row">
+            <div class="wrangle-name">${p.name}</div>
+            <div class="wrangle-dots">
+              <div class="wrangle-dot-group">${activeDots}</div>
+              <div class="wrangle-dot-group">${safeDots}</div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <div class="wrangle-status">
+      <p>Rolling: ${rollerName}</p>
+      <p>Leader: ${leaderHtml}</p>
+    </div>
+  `;
+}
+
 // ── Game over ─────────────────────────────────────────────────────────────────
 function renderGameOver() {
   let overlay = document.getElementById("game-over-overlay");
@@ -882,32 +1063,56 @@ function renderGameOver() {
     overlay.style.cssText = `
       position:fixed; inset:0; background:#1e1206;
       display:flex; flex-direction:column; align-items:center;
-      justify-content:center; z-index:60; padding:20px; gap:16px;
+      justify-content:flex-start; z-index:60; padding:24px 16px; gap:16px;
       overflow-y:auto;
     `;
     document.body.appendChild(overlay);
   }
 
+  const categories = [
+    { key: "pubs", label: "Pubs" },
+    { key: "maps", label: "Maps" },
+    { key: "guards", label: "Guards" },
+    { key: "treasure", label: "Treasure" },
+    { key: "scorpions", label: "Scorpions" },
+    { key: "supplies", label: "Supplies" },
+    { key: "rendezvous", label: "Rendezvous" },
+    { key: "wrangle", label: "Wrangle" }
+  ];
+
   const players = (gameState.players || []).slice().sort(
-    (a, b) => (b.score ? b.score.total : 0) - (a.score ? a.score.total : 0)
+    (a, b) => ((b.score || {}).total || 0) - ((a.score || {}).total || 0)
   );
+
+  const rows = players.map((p, i) => {
+    const c = p.color;
+    const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
+    const score = p.score || {};
+    const cells = categories.map(cat => `<td style="text-align:center; padding:6px 8px;">${score[cat.key] || 0}</td>`).join("");
+    return `
+      <tr style="background:${i === 0 ? 'rgba(201,146,42,0.15)' : 'transparent'};">
+        <td style="padding:6px 8px; color:${colorCss}; font-weight:600; white-space:nowrap;">${i === 0 ? '👑 ' : ''}${p.name}</td>
+        ${cells}
+        <td style="text-align:center; padding:6px 8px; color:#e8b84b; font-family:'Pirata One',cursive; font-size:1.1rem;">${score.total || 0}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const headerCells = categories.map(cat => `<th style="padding:6px 8px; font-size:0.8rem; color:var(--gold-light); font-weight:normal;">${cat.label}</th>`).join("");
 
   overlay.innerHTML = `
     <h2 style="font-family:'Pirata One',cursive;color:#e8b84b;font-size:2rem;">🏴‍☠️ Game Over!</h2>
-    <div style="width:100%; max-width:360px;">
-      ${players.map((p, i) => {
-        const c = p.color;
-        const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
-        return `
-          <div style="display:flex; justify-content:space-between; align-items:center;
-            background:${i === 0 ? 'rgba(201,146,42,0.2)' : '#2a1810'};
-            border:2px solid ${i === 0 ? '#e8b84b' : '#6b3a1f'};
-            border-radius:6px; padding:10px 14px; margin-bottom:8px;">
-            <span style="color:${colorCss}; font-weight:600;">${i === 0 ? '👑 ' : ''}${p.name}</span>
-            <span style="color:#e8b84b; font-family:'Pirata One',cursive; font-size:1.2rem;">${p.score ? p.score.total : 0} pts</span>
-          </div>
-        `;
-      }).join("")}
+    <div style="width:100%; max-width:700px; overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; color:var(--parchment); font-size:0.95rem;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--wood-light);">
+            <th style="padding:6px 8px; text-align:left; color:var(--gold-light); font-weight:normal;">Player</th>
+            ${headerCells}
+            <th style="padding:6px 8px; color:var(--gold-light); font-weight:normal;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
     <button class="action-btn" style="max-width:220px;" onclick="window.location.href='/'">Back to Lobby</button>
   `;
@@ -917,16 +1122,39 @@ function renderGameOver() {
 function updateUI() {
   if (!gameState) return;
 
+  const wrangleActive = gameState.wrangle && gameState.wrangle.active;
+
   if (gameState.phase === "character_select") {
     document.getElementById("board-row").style.display = "none";
     document.getElementById("status-bar").style.display = "none";
+    document.getElementById("wrangle-screen").classList.remove("open");
+    document.getElementById("action-panel").classList.remove("open");
     renderCharacterSelect();
+    return;
+  } else if (gameState.phase === "game_over") {
+    document.getElementById("board-row").style.display = "none";
+    document.getElementById("status-bar").style.display = "none";
+    document.getElementById("wrangle-screen").classList.remove("open");
+    document.getElementById("action-panel").classList.remove("open");
+    renderGameOver();
+    return;
+  } else if (wrangleActive) {
+    document.getElementById("board-row").style.display = "none";
+    document.getElementById("status-bar").style.display = "none";
+    const overlay = document.getElementById("character-select-overlay");
+    if (overlay) overlay.remove();
+    const goOverlay = document.getElementById("game-over-overlay");
+    if (goOverlay) goOverlay.remove();
+    renderWrangleScreen();
     return;
   } else {
     document.getElementById("board-row").style.display = "";
     document.getElementById("status-bar").style.display = "";
+    document.getElementById("wrangle-screen").classList.remove("open");
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
+    const goOverlay = document.getElementById("game-over-overlay");
+    if (goOverlay) goOverlay.remove();
   }
 
   document.getElementById("round-display").textContent = `Round ${gameState.round || "—"} of 5`;
@@ -934,6 +1162,10 @@ function updateUI() {
 
   renderTableau();
   renderContestOverlay();
+
+  if (document.getElementById("inventory-overlay").classList.contains("open")) {
+    renderInventory();
+  }
 
   // Status bar
   const bar = document.getElementById("status-bar");
@@ -1123,7 +1355,7 @@ function buildActionButtons() {
 
   if (gameState.active_player !== myPlayerIndex) {
     container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">Waiting for your turn...</p>`;
-    return; 
+    return;
   }
 
   if (phase === "guard_start") {
@@ -1197,6 +1429,7 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "rest", player_index: myPlayerIndex });
       closeActionPanel();
     });
+    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
   } else if (phase === "rendezvous_card") {
     const card = gameState.rendezvous;
     if (card) {
@@ -1283,6 +1516,7 @@ function buildActionButtons() {
       socket.emit("player_action", { room_id: myRoomId, type: "avast", player_index: myPlayerIndex });
       closeActionPanel();
     });
+    addActionBtn(container, "View Action Log", "", () => { closeActionPanel(); toggleLog(); });
   }
 }
 
@@ -1292,7 +1526,7 @@ function showRollResult(container) {
 
   const dieImg = document.createElement("img");
   dieImg.src = `${SERVER}/assets/dice/${roll.image}`;
-  dieImg.style.cssText = "width:70px; display:block; margin:0 auto 10px; border-radius:6px;";
+  dieImg.style.cssText = "width:140px; display:block; margin:0 auto 10px; border-radius:6px;";
   container.appendChild(dieImg);
 
   const label = document.createElement("p");
@@ -1336,6 +1570,62 @@ function closeActionPanel() {
 }
 function toggleLog() {
   document.getElementById("log-panel").classList.toggle("open");
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+const CARD_FOLDERS_INV = {
+  pubs: "pubs",
+  maps: "maps",
+  treasure: "treasure",
+  scorpions: "treasure",
+  large_guard: "guards",
+  small_guard: "guards",
+  supplies: "supplies",
+  rendezvous: "rendezvous",
+  wrangles: "wrangle"
+};
+
+function toggleInventory() {
+  const overlay = document.getElementById("inventory-overlay");
+  const opening = !overlay.classList.contains("open");
+  overlay.classList.toggle("open");
+  if (opening) renderInventory();
+}
+
+function renderInventory() {
+  const content = document.getElementById("inventory-content");
+  const player = gameState.players[myPlayerIndex];
+  if (!player) { content.innerHTML = ""; return; }
+
+  const groups = [
+    { key: "pubs", label: "Pubs" },
+    { key: "maps", label: "Maps" },
+    { key: "treasure", label: "Treasure" },
+    { key: "scorpions", label: "Scorpions" },
+    { key: "large_guard", label: "Large Guards" },
+    { key: "small_guard", label: "Small Guards" },
+    { key: "supplies", label: "Supplies" },
+    { key: "rendezvous", label: "Rendezvous" },
+    { key: "wrangles", label: "Wrangle" }
+  ];
+
+  const html = groups.map(g => {
+    const cards = player[g.key] || [];
+    if (!cards.length) return "";
+    const folder = CARD_FOLDERS_INV[g.key] || g.key;
+    return `
+      <div>
+        <div class="inv-group-label">${g.label} (${cards.length})</div>
+        <div class="inv-cards">
+          ${cards.map(c => `
+            <img class="inv-card" src="${SERVER}/assets/${folder}/${c.image_file}" onerror="this.style.display='none'">
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  content.innerHTML = html || `<p style="color:var(--rope); font-style:italic; text-align:center;">No cards collected yet.</p>`;
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
