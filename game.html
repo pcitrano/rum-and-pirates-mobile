@@ -827,13 +827,15 @@ function renderContestOverlay() {
   const contest = gameState.scorpion_contest;
   const pub = gameState.pub;
   const fergusRoll = gameState.fergus_guard_roll;
+  const wrangle = gameState.wrangle;
   const rollPhases = ["roll_start", "roll_no_barrels", "roll_with_barrels", "roll_with_rerolls"];
 
   const scorpionActive = contest && contest.contest_active && rollPhases.includes(gameState.phase);
   const pubActive = pub && pub.pub_active && rollPhases.includes(gameState.phase);
   const fergusActive = fergusRoll != null && rollPhases.includes(gameState.phase);
+  const wrangleActive = wrangle && wrangle.active && rollPhases.includes(gameState.phase);
 
-  if (!scorpionActive && !pubActive && !fergusActive) {
+  if (!scorpionActive && !pubActive && !fergusActive && !wrangleActive) {
     overlay.style.display = "none";
     return;
   }
@@ -852,6 +854,15 @@ function renderContestOverlay() {
     document.getElementById("contest-turn-label").textContent = `⚔️ ${rollerName} moves in!`;
     document.getElementById("contest-progress-label").innerHTML =
       `Needs <strong>${fergusRoll.guard_points}</strong> or higher to steal the guard`;
+  } else if (wrangleActive) {
+    document.getElementById("contest-turn-label").textContent = `🛏️ ${rollerName}'s roll`;
+    if (wrangle.leader !== null && wrangle.leader !== undefined) {
+      const leaderName = (gameState.players[wrangle.leader] || {}).name || "?";
+      document.getElementById("contest-progress-label").innerHTML =
+        `Beat <strong>${leaderName}</strong>'s roll of <strong>${wrangle.leader_roll}</strong> for a bunk`;
+    } else {
+      document.getElementById("contest-progress-label").innerHTML = `Rolling for the best bunk`;
+    }
   } else {
     const participantNames = pub.participants.map(i => (gameState.players[i] || {}).name || "?").join(", ");
     document.getElementById("contest-turn-label").textContent = `🍺 ${rollerName}'s roll`;
@@ -860,6 +871,46 @@ function renderContestOverlay() {
   }
 
   overlay.style.display = "block";
+}
+
+// ── Game over ─────────────────────────────────────────────────────────────────
+function renderGameOver() {
+  let overlay = document.getElementById("game-over-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "game-over-overlay";
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:#1e1206;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; z-index:60; padding:20px; gap:16px;
+      overflow-y:auto;
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  const players = (gameState.players || []).slice().sort(
+    (a, b) => (b.score ? b.score.total : 0) - (a.score ? a.score.total : 0)
+  );
+
+  overlay.innerHTML = `
+    <h2 style="font-family:'Pirata One',cursive;color:#e8b84b;font-size:2rem;">🏴‍☠️ Game Over!</h2>
+    <div style="width:100%; max-width:360px;">
+      ${players.map((p, i) => {
+        const c = p.color;
+        const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center;
+            background:${i === 0 ? 'rgba(201,146,42,0.2)' : '#2a1810'};
+            border:2px solid ${i === 0 ? '#e8b84b' : '#6b3a1f'};
+            border-radius:6px; padding:10px 14px; margin-bottom:8px;">
+            <span style="color:${colorCss}; font-weight:600;">${i === 0 ? '👑 ' : ''}${p.name}</span>
+            <span style="color:#e8b84b; font-family:'Pirata One',cursive; font-size:1.2rem;">${p.score ? p.score.total : 0} pts</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <button class="action-btn" style="max-width:220px;" onclick="window.location.href='/'">Back to Lobby</button>
+  `;
 }
 
 // ── UI updates ────────────────────────────────────────────────────────────────

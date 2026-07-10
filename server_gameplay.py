@@ -908,6 +908,235 @@ class ServerGameplay:
         game_state["reclaim_2"] = None
         game_state["phase"] = "post_move"
 
+    # ── Wrangle ────────────────────────────────────────────────────────
+    def active_players(self, game_state):
+        return [
+            player["id"]
+            for player in game_state["players"]
+            if player["wrangle_pirates"] + player["safe_pirates"]
+        ]
+
+    def initiate_wrangle(self, game_state):
+        nought = next(
+            (p for p in game_state["players"]
+             if p["character"] is not None and p["character"]["name"] == "Captain Nought the Night Owl"),
+            None
+        )
+        if nought and nought["board_position"] > 0:
+            boarded_players = sorted(
+                [p for p in game_state["players"] if p["board_position"] > 0],
+                key=lambda p: p["board_position"]
+            )
+            nought_pos = nought["board_position"]
+            if nought_pos != len(boarded_players):
+                swap_target = next(
+                    (p for p in boarded_players if p["board_position"] == nought_pos + 1),
+                    None
+                )
+                if swap_target:
+                    nought["board_position"], swap_target["board_position"] = \
+                        swap_target["board_position"], nought["board_position"]
+                    self.log_action(game_state, f"{nought['name']} slips into a better bunk!")
+
+        game_state["wrangle"] = {
+            "active": True,
+            "round": 0,
+            "eliminated": [],
+            "leader": None,
+            "leader_roll": None,
+            "queue": []
+        }
+
+        for player in game_state["players"]:
+            player["wrangle_pirates"] = player["pirates"]
+            player["safe_pirates"] = 0
+
+        if len(self.active_players(game_state)) <= 1:
+            return self.finish_wrangle(game_state)
+
+        return self.start_wrangle_round(game_state)
+
+    def start_wrangle_round(self, game_state):
+        wrangle = game_state["wrangle"]
+        players = game_state["players"]
+        wrangle["leader"] = None
+        wrangle["leader_roll"] = None
+        wrangle["queue"] = []
+
+        active = [p for p in players if p["wrangle_pirates"] + p["safe_pirates"] > 0]
+        if len(active) <= 1:
+            return self.finish_wrangle(game_state)
+
+        active_sorted = sorted(
+            [p for p in players if p["wrangle_pirates"] > 0],
+            key=lambda p: p["board_position"]
+        )
+
+        pirate_counts = sorted(
+            {p["wrangle_pirates"] for p in active},
+            reverse=True
+        )
+
+        highest = pirate_counts[0]
+        leaders = [p for p in active if p["wrangle_pirates"] == highest]
+        excess = 0
+        if len(leaders) == 1 and len(pirate_counts) > 1:
+            next_highest = pirate_counts[1]
+            excess = highest - next_highest
+        if excess > 0:
+            leader = leaders[0]
+            leader["wrangle_pirates"] -= excess
+            leader["safe_pirates"] += excess
+
+        groups = {}
+        for player in active_sorted:
+            count = player["wrangle_pirates"]
+            groups.setdefault(count, []).append(players.index(player))
+
+        gauntlet_group = None
+        for count in sorted(groups.keys(), reverse=True):
+            if len(groups[count]) >= 2:
+                gauntlet_group = groups[count]
+                break
+
+        if gauntlet_group is None:
+            all_zero = all(p["wrangle_pirates"] == 0 for p in players)
+            if all_zero:
+                for player in game_state["players"]:
+                    player["wrangle_pirates"] = player["safe_pirates"]
+                    player["safe_pirates"] = 0
+                return self.start_wrangle_round(game_state)
+            return self.finish_wrangle(game_state)
+
+        wrangle["queue"] = gauntlet_group.copy()
+        return self.run_gauntlet_roll(game_state)
+
+    def run_gauntlet_roll(self, game_state):
+        wrangle = game_state["wrangle"]
+        queue = wrangle["queue"]
+
+        if not queue:
+            return self.round_end(game_state)
+
+        player_index = queue[0]
+        return self.roll_start(game_state, player_index)
+
+    def resolve_wrangle_roll(self, game_state):
+        roll_data = game_state["current_roll"]
+        player_index = roll_data["player"]
+        roll = roll_data["roll"]
+        wrangle = game_state["wrangle"]
+
+        queue = wrangle["queue"]
+        current_player = game_state["players"][player_index]
+
+        leader = wrangle["leader"]
+        leader_roll = wrangle["leader_roll"]
+
+        def eliminate_if_needed(player):
+            if (
+                player["wrangle_pirates"] == 0
+                and player["safe_pirates"] == 0
+                and player["id"] not in wrangle["eliminated"]
+            ):
+                wrangle["eliminated"].append(player["id"])
+
+        if leader is None:
+            wrangle["leader"] = player_index
+            wrangle["leader_roll"] = roll
+        else:
+            leader_player = game_state["players"][leader]
+
+            challenger_wins = (
+                roll > leader_roll or
+                (roll == leader_roll and
+                 current_player["board_position"] > leader_player["board_position"])
+            )
+
+            if challenger_wins:
+                leader_player["wrangle_pirates"] -= 1
+                eliminate_if_needed(leader_player)
+                wrangle["leader"] = player_index
+                wrangle["leader_roll"] = roll
+            else:
+                current_player["wrangle_pirates"] -= 1
+                eliminate_if_needed(current_player)
+
+        queue.pop(0)
+        if queue:
+            return self.run_gauntlet_roll(game_state)
+        else:
+            return self.start_wrangle_round(game_state)
+
+    def finish_wrangle(self, game_state):
+        wrangle = game_state["wrangle"]
+
+        card_1 = game_state["tableau"]["wrangle_bunk"]
+        card_2 = game_state["tableau"]["wrangle_hammock"]
+        card_3 = game_state["tableau"]["wrangle_bedroll"]
+
+        active = self.active_players(game_state)
+        winner_id = active[0]
+
+        id_to_index = {
+            player["id"]: i
+            for i, player in enumerate(game_state["players"])
+        }
+
+        eliminated_players = [
+            id_to_index[player_id]
+            for player_id in reversed(wrangle["eliminated"])
+        ]
+
+        winner_index = id_to_index[winner_id]
+        ranking = [winner_index] + eliminated_players
+        participants = len(ranking)
+
+        if len(game_state["players"]) <= 3:
+            if participants == 1:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+            elif participants == 2:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_2)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the hammock.")
+            else:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_2)
+                game_state["players"][ranking[2]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the hammock.")
+                self.log_action(game_state, f"{game_state['players'][ranking[2]]['name']} slept on the floor.")
+        else:
+            if participants == 1:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[0]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk and stole the bedroll!")
+            elif participants == 2:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[0]]["wrangles"].append(card_3)
+                game_state["players"][ranking[1]]["wrangles"].append(card_2)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk and stole the bedroll!")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the hammock.")
+            else:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_2)
+                game_state["players"][ranking[2]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the hammock.")
+                self.log_action(game_state, f"{game_state['players'][ranking[2]]['name']} slept on the floor.")
+
+        if game_state["round"] < 5:
+            game_state["tableau"]["wrangle_bunk"] = game_state["decks"]["wrangle_bunk"].pop()
+            game_state["tableau"]["wrangle_hammock"] = game_state["decks"]["wrangle_hammock"].pop()
+            game_state["tableau"]["wrangle_bedroll"] = game_state["decks"]["wrangle_bedroll"].pop()
+
+        game_state["wrangle"]["active"] = False
+        self.score_players(game_state)
+
+        return self.round_end(game_state)
+
     # ── Dice Rolling ────────────────────────────────────────────────────────
     def roll_start(self, game_state, player_index):
         game_state["next_roller"] = player_index
@@ -958,7 +1187,7 @@ class ServerGameplay:
         game_state["players"][player_id]["free_rerolls"] = 0
  
         if game_state.get("wrangle", {}).get("active"):
-            return  # not yet migrated
+            return self.resolve_wrangle_roll(game_state)
         if game_state.get("fergus_guard_roll") is not None:
             return self.resolve_fergus_roll(game_state)
         if space_type == "treasure":
@@ -998,11 +1227,7 @@ class ServerGameplay:
 
         if all_on_board:
             self.log_action(game_state, f"{player['name']} went on board with {player['pirates']} pirates.")
-            game_state["phase"] = "wrangle"
-            # Wrangle isn't migrated yet — flag it so the client knows
-            # nothing further will happen automatically.
-            game_state.setdefault("wrangle", {})["active"] = True
-            return
+            return self.initiate_wrangle(game_state)
 
         self.avast_turn(game_state)
 
@@ -1015,9 +1240,6 @@ class ServerGameplay:
         else:
             self.log_action(game_state, f"{players[current]['name']} avasted.")
 
-        if not game_state["legal_moves"]:
-            self.teleport_captain(game_state)
-        
         for player in players:
             self.sort_hand(player)
 
@@ -1032,6 +1254,32 @@ class ServerGameplay:
             game_state["phase"] = "start_turn"
             return
 
-        # No eligible player found — wrangle isn't migrated yet.
-        game_state["phase"] = "wrangle"
-        game_state.setdefault("wrangle", {})["active"] = True
+        self.initiate_wrangle(game_state)
+
+    def round_end(self, game_state):
+        round_num = game_state["round"]
+
+        if round_num == 5:
+            game_state["phase"] = "game_over"
+            return game_state
+
+        game_state["round"] += 1
+
+        for player in game_state["players"]:
+            player["pirates"] = 15 - player["pirate_reserve"]
+            player["board_position"] = 0
+            player["pirates_on_board"] = 0
+            player["wrangle_pirates"] = 0
+            player["safe_pirates"] = 0
+
+            if player["character"] is not None and player["character"]["name"] == "Captain Midas the Master of Coin":
+                player["coins"] += 1
+
+        game_state["starting_player"] = (game_state["starting_player"] + 1) % len(game_state["players"])
+        game_state["active_player"] = game_state["starting_player"]
+
+        game_state["occupied_paths"] = []
+        self.refresh_legal_moves(game_state)
+        game_state["phase"] = "start_turn"
+
+        return game_state
