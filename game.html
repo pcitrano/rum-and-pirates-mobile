@@ -123,66 +123,79 @@
     padding: 20px;
   }
   #wrangle-screen.open { display: flex; }
-  .wrangle-mast-wrap {
-    position: relative;
+  .wrangle-header-row {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 4px;
     width: 100%;
-    max-width: 420px;
-    margin-bottom: 10px;
+    max-width: 460px;
+    margin-bottom: 4px;
+  }
+  .wrangle-header-cell {
+    font-family: 'Pirata One', cursive;
+    color: var(--ink);
+    font-size: 1.3rem;
+    text-align: center;
+  }
+  .wrangle-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 460px;
+  }
+  .wrangle-side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .wrangle-active-col { align-items: flex-end; }
+  .wrangle-safe-col { align-items: flex-start; }
+  .wrangle-mast-wrap {
+    width: 130px;
+    flex-shrink: 0;
   }
   .wrangle-mast-wrap img {
     width: 100%;
     display: block;
   }
-  .wrangle-columns {
-    display: flex;
-    justify-content: center;
-    gap: 70px;
-    font-family: 'Pirata One', cursive;
-    color: var(--ink);
-    font-size: 1.6rem;
-    margin-bottom: 6px;
-  }
-  .wrangle-rows {
-    width: 100%;
-    max-width: 420px;
-  }
-  .wrangle-row {
+  .wrangle-player-row {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
+    gap: 8px;
+    height: 26px;
   }
+  .wrangle-active-col .wrangle-player-row { flex-direction: row; }
+  .wrangle-safe-col .wrangle-player-row { flex-direction: row-reverse; }
   .wrangle-name {
     font-family: 'Pirata One', cursive;
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     color: var(--ink);
-    width: 90px;
-    flex-shrink: 0;
-  }
-  .wrangle-dots {
-    display: flex;
-    flex: 1;
-    justify-content: space-around;
+    white-space: nowrap;
   }
   .wrangle-dot-group {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
-    justify-content: center;
-    width: 45%;
+    max-width: 90px;
   }
   .wrangle-dot {
-    width: 18px; height: 18px;
+    width: 15px; height: 15px;
     border-radius: 50%;
     border: 2px solid rgba(0,0,0,0.3);
+    flex-shrink: 0;
   }
   .wrangle-status {
     font-family: 'Pirata One', cursive;
     color: var(--ink);
-    font-size: 1.3rem;
-    margin-top: 20px;
+    font-size: 1.2rem;
+    margin-top: 16px;
     text-align: center;
   }
-  .wrangle-status p { margin-bottom: 8px; }
+  .wrangle-status p { margin-bottom: 6px; }
 
   /* ── Inventory overlay ── */
   #inventory-overlay {
@@ -1021,31 +1034,44 @@ function renderWrangleScreen() {
   }
 
   screen.innerHTML = `
-    <div class="wrangle-mast-wrap">
-      <img src="${SERVER}/assets/wrangle/Wrangle.png" onerror="this.style.display='none'">
+    <div class="wrangle-header-row">
+      <div class="wrangle-header-cell" style="width:140px;">Active</div>
+      <div style="width:130px;"></div>
+      <div class="wrangle-header-cell" style="width:140px;">Safe</div>
     </div>
-    <div class="wrangle-columns">
-      <span>Active</span>
-      <span>Safe</span>
-    </div>
-    <div class="wrangle-rows">
-      ${players.map(p => {
-        const c = p.color;
-        const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#333');
-        const activeDots = Array(p.wrangle_pirates || 0).fill(0)
-          .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
-        const safeDots = Array(p.safe_pirates || 0).fill(0)
-          .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
-        return `
-          <div class="wrangle-row">
-            <div class="wrangle-name">${p.name}</div>
-            <div class="wrangle-dots">
+    <div class="wrangle-body">
+      <div class="wrangle-side-col wrangle-active-col">
+        ${players.map(p => {
+          const c = p.color;
+          const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#333');
+          const activeDots = Array(p.wrangle_pirates || 0).fill(0)
+            .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
+          return `
+            <div class="wrangle-player-row">
+              <div class="wrangle-name">${p.name}</div>
               <div class="wrangle-dot-group">${activeDots}</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      <div class="wrangle-mast-wrap">
+        <img src="${SERVER}/assets/wrangle/Wrangle.png" onerror="this.style.display='none'">
+      </div>
+
+      <div class="wrangle-side-col wrangle-safe-col">
+        ${players.map(p => {
+          const c = p.color;
+          const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#333');
+          const safeDots = Array(p.safe_pirates || 0).fill(0)
+            .map(() => `<div class="wrangle-dot" style="background:${colorCss};"></div>`).join("");
+          return `
+            <div class="wrangle-player-row">
               <div class="wrangle-dot-group">${safeDots}</div>
             </div>
-          </div>
-        `;
-      }).join("")}
+          `;
+        }).join("")}
+      </div>
     </div>
     <div class="wrangle-status">
       <p>Rolling: ${rollerName}</p>
