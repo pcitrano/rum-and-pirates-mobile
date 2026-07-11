@@ -1224,9 +1224,9 @@ function updateUI() {
     div.className = `player-row ${isActive ? "active" : "inactive"}`;
     const c = player.color;
     const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
-    const myCoins = (i === myPlayerIndex && player.coins) ? player.coins : null;
+    const myCoins = (i === myPlayerIndex && player.coins !== undefined) ? player.coins : null;
     const coinsHtml = myCoins !== null
-      ? '<span class="player-coins">🪙 ${player.coins || 0}</span>'
+      ? `<span class="player-coins">🪙 ${player.coins || 0}</span>`
       : '';
     const myScore = (i === myPlayerIndex && player.score) ? player.score.total : null;
     const scoreHtml = myScore !== null
