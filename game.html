@@ -968,6 +968,7 @@ function cardImageUrl(category, card) {
 function renderTableau() {
     const panel = document.getElementById("tableau-panel");
     const tableau = gameState.tableau;
+    const groups = [];
 
     if (!tableau) {
         panel.innerHTML = "";
