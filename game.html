@@ -232,10 +232,29 @@
     gap: 6px;
     flex-wrap: wrap;
   }
+  .inv-card-wrap {
+    position: relative;
+    width: 60px;
+  }
   .inv-card {
     width: 60px;
+    display: block;
     border-radius: 4px;
     border: 1px solid var(--wood-light);
+  }
+  .inv-card-completed-badge {
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #2ecc71;
+    border: 2px solid #1e1206;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.9rem;
   }
 
   /* ── Tableau side panel ── */
@@ -1644,7 +1663,10 @@ function renderInventory() {
         <div class="inv-group-label">${g.label} (${cards.length})</div>
         <div class="inv-cards">
           ${cards.map(c => `
-            <img class="inv-card" src="${SERVER}/assets/${folder}/${c.image_file}" onerror="this.style.display='none'">
+            <div class="inv-card-wrap">
+              <img class="inv-card" src="${SERVER}/assets/${folder}/${c.image_file}" onerror="this.style.display='none'">
+              ${g.key === "rendezvous" && c.completed ? '<div class="inv-card-completed-badge">✕</div>' : ''}
+            </div>
           `).join("")}
         </div>
       </div>
