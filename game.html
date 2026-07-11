@@ -263,36 +263,54 @@
     top: 115px;
     left: 0;
     right: 0;
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
+
     overflow-x: auto;
     overflow-y: hidden;
-    gap: 8px;
-    padding: 8px;
-    background: rgba(30, 18, 6, 0.85);
+
+    padding: 8px 16px;
+
+    background: rgba(30,18,6,.85);
     border-top: 2px solid var(--rope);
     border-bottom: 2px solid var(--rope);
-    z-index: 9;
-}
+  }
 
-.tableau-card-wrap {
+  #tableau-strip {
+    display: flex;
+    justify-content: center;   /* Centers on large screens */
+    align-items: flex-start;
+    width: max-content;         /* Expands as cards are added */
+    min-width: 100%;            /* Allows centering when there's room */
+    margin: 0 auto;
+  }
+
+  .tableau-group {
+    display: flex;
+    gap: 4px;               /* gap between cards in a category */
+    margin-right: 18px;     /* gap between categories */
+    flex-shrink: 0;
+  }
+
+  .tableau-group:last-child {
+    margin-right: 0;
+  }
+
+  .tableau-card-wrap {
     flex: 0 0 auto;
-}
+  }
 
-.tableau-card {
-    width: 90px;
-    height: 90px;
+  .tableau-card {
+    width: 75px;
+    height: 75px;
     object-fit: cover;
     border-radius: 4px;
     border: 1px solid var(--wood-light);
     display: block;
-}
+  }
 
   /* ── Player status bar ── */
   #status-bar {
     position: absolute;
-    top: 60px;         
+    top: 10px;         
     left: 0;
     width: 100%;
     height: auto;
@@ -983,14 +1001,16 @@ function renderTableau() {
     if (tableau.wrangle_bedroll)
         cards.push({ card: tableau.wrangle_bedroll, category: "wrangle_bedroll" });
 
-    panel.innerHTML = cards.map(({ card, category }) => `
-        <div class="tableau-card-wrap">
+    panel.innerHTML = groups.map(group => `
+      <div class="tableau-group">
+        ${group.cards.map(({card, category}) => `
             <img
                 class="tableau-card"
                 src="${cardImageUrl(category, card)}"
                 onerror="this.style.display='none'"
             >
-        </div>
+        `).join("")}
+      </div>
     `).join("");
 }
 
