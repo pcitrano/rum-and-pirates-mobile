@@ -249,6 +249,7 @@ class ServerGameplay:
                 card["completed"] = True
                 rendezvous_scored = True
                 self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
+                break
 
         sterling_free_move = False
         if player["character"] is not None:
@@ -383,6 +384,7 @@ class ServerGameplay:
                 card["completed"] = True
                 rendezvous_scored = True
                 self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
+                break
 
         game_state["dark_alley"] = {}
         self.score_players(game_state)
@@ -1203,6 +1205,8 @@ class ServerGameplay:
             return False
         player["coins"] -= 1
         self.log_action(game_state, f"{player['name']} spent a coin to move again.")
+        
+        self.refresh_legal_moves(game_state)
         if not game_state["legal_moves"]:
             self.teleport_captain(game_state)
         game_state["phase"] = "start_turn"
@@ -1234,6 +1238,10 @@ class ServerGameplay:
     def avast_turn(self, game_state):
         players = game_state["players"]
         current = game_state["active_player"]
+
+        self.refresh_legal_moves(game_state)
+        if not game_state["legal_moves"]:
+            self.teleport_captain(game_state)
 
         if players[current]["board_position"] > 0:
             self.log_action(game_state, f"{players[current]['name']} went on board with {players[current]['pirates']} pirates.")
