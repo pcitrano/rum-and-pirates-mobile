@@ -1224,12 +1224,25 @@ function updateUI() {
     div.className = `player-row ${isActive ? "active" : "inactive"}`;
     const c = player.color;
     const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
+    const myCoins = (i === myPlayerIndex && player.coins) ? player.coins : null;
+    const coinsHtml = myCoins !== null
+      ? '<span class="player-coins">🪙 ${player.coins || 0}</span>'
+      : '';
+    const myScore = (i === myPlayerIndex && player.score) ? player.score.total : null;
+    const scoreHtml = myScore !== null
+      ? `<span class="player-coins" style="color:var(--gold-light); font-weight:600;">🏆 ${myScore}</span>`
+      : '';
+    const boarded = player.board_position > 0;
+    const boardedFlagHtml = boarded 
+      ? `<span class="boarded-flag" title="On Board">🏴‍☠️</span>` : '';
     div.innerHTML = `
       ${isActive ? '<span class="active-crown">⚓</span>' : '<span style="width:14px;display:inline-block"></span>'}
       <span class="player-name" style="color:${colorCss}">${player.name}</span>
-      <span class="player-pirates">🏴 ${player.pirates || 0}/${total}</span>
+      ${boardedFlagHtml}
+      <span class="player-pirates">☠️ ${player.pirates || 0}/${total}</span>
       <span class="player-barrels">🛢 ${player.barrels || 0}</span>
-      <span class="player-coins">🪙 ${player.coins || 0}</span>
+      ${coinsHtml}
+      ${scoreHtml}
     `;
     bar.appendChild(div);
   });
@@ -1660,9 +1673,14 @@ function renderInventory() {
     const cards = player[g.key] || [];
     if (!cards.length) return "";
     const folder = CARD_FOLDERS_INV[g.key] || g.key;
+    // Rendezvous cards only count toward score once completed
+    const totalPoints = cards.reduce((sum, c) => {
+      if (g.key === "rendezvous") return sum + (c.completed ? (c.points || 0) : 0);
+      return sum + (c.points || 0);
+    }, 0);
     return `
       <div>
-        <div class="inv-group-label">${g.label} (${cards.length})</div>
+        <div class="inv-group-label">${g.label} (${totalPoints} pts)</div>
         <div class="inv-cards">
           ${cards.map(c => `
             <div class="inv-card-wrap">
