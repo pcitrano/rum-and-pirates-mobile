@@ -896,9 +896,11 @@ function promptDarkAlleyExit(exitId, exitMove) {
 
 function promptMove(move) {
   const container = document.getElementById("action-buttons");
+  const boardSpace = spaceLoookup[move.destination];
+  const spaceLabel = (boardSpace ? boardSpace.type : move.destination_type).replace(/_/g, ' ');
   container.innerHTML = `
     <p style="color:var(--parchment);margin-bottom:12px;">
-      Move to <strong style="color:var(--gold-light)">${move.destination_type.replace(/_/g,' ')}</strong>
+      Move to <strong style="color:var(--gold-light)">${spaceLabel}</strong>
       for <strong style="color:var(--gold-light)">${move.cost} pirate${move.cost !== 1 ? 's' : ''}</strong>?
     </p>
   `;

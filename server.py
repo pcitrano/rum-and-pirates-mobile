@@ -18,6 +18,16 @@ gameplay = ServerGameplay()
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 
+@app.route("/")
+def lobby():
+    with open("lobby.html") as f:
+        return f.read()
+
+@app.route("/game")
+def game():
+    with open("game.html") as f:
+        return f.read()
+
 @app.route("/assets/<path:filename>")
 def assets(filename):
     return send_from_directory("assets", filename)
@@ -31,17 +41,6 @@ def get_tile_data():
             with open(path) as f:
                 tile_data.append(json.load(f))
     return Response(json.dumps(tile_data), mimetype="application/json")
-
-# ── Main Lobby and Game ─────────────────────────────────────────────────────────────────────
-@app.route("/")
-def lobby():
-    with open("lobby.html") as f:
-        return f.read()
-
-@app.route("/game")
-def game():
-    with open("game.html") as f:
-        return f.read()
 
 # ── Rooms ─────────────────────────────────────────────────────────────────────
 
@@ -119,7 +118,11 @@ def on_update_state(data):
 
 @socketio.on("player_action")
 def on_player_action(data):
-
+    """
+    Executes core turn actions server-side: move, rest, go_on_board,
+    move_again. Any action not yet migrated is relayed to other clients
+    as before, in case the desktop host still handles it locally.
+    """
     room_id = data["room_id"]
     action_type = data.get("type")
 
@@ -137,6 +140,10 @@ def on_player_action(data):
             emit("error", {"message": "Illegal move"})
             return
 
+        # Auto-confirm only for a normal captain-space move — the web
+        # client already shows a confirm dialog before sending it. Dark
+        # alley entries land in dark_alley_ask/dark_alley_start instead
+        # and need further player input before anything is committed.
         if game_state["phase"] == "confirm_move":
             gameplay.confirm_move(game_state)
 
@@ -192,7 +199,7 @@ def on_player_action(data):
 
     elif action_type == "choose_guard":
         gameplay.choose_guard(game_state, data.get("guard_size"))
- 
+
     elif action_type == "fight_guard":
         gameplay.resolve_guard(game_state)
 
@@ -219,6 +226,15 @@ def on_player_action(data):
         # Not yet migrated — relay to other clients (e.g. desktop host)
         emit("action_received", data, room=room_id, include_self=False)
         return
+
+    # Record stats the moment a server-hosted game finishes, exactly once.
+    if game_state.get("phase") == "game_over" and not game_state.get("stats_recorded"):
+        try:
+            game_result = build_game_result_from_state(game_state)
+            record_game_result(game_result)
+            game_state["stats_recorded"] = True
+        except Exception as e:
+            print(f"[stats] failed to record game result: {e}")
 
     rooms[room_id]["game_state"] = game_state
     socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
@@ -318,18 +334,6 @@ def on_rejoin_room(data):
     emit("rejoined", {"room_id": room_id})
     emit("game_state_update", room["game_state"])
 
-@socketio.on("chat")
-def handle_chat(data):
-
-    room = rooms[data["room_id"]]
-    player = next((p for p in room["players"] if p["sid"] == request.sid), None)
-
-    if player is None:
-        print(f"[server] chat from unknown player {request.sid}", flush=True)
-        return
-
-    emit("chat", {"player": player["name"], "text": data["text"]}, room=data["room_id"])
-
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
 def load_stats():
@@ -346,18 +350,21 @@ def save_stats(data):
 def get_stats():
     return Response(json.dumps(load_stats()), mimetype="application/json")
 
-@app.route("/stats/add_game", methods=["POST"])
-def add_game():
-    data = request.get_json()
+def record_game_result(game_result):
+    """
+    Shared stats-recording logic. Used by the /stats/add_game HTTP route
+    (for desktop clients) and called directly, in-process, when a
+    server-hosted web game reaches game_over.
+    """
     stats = load_stats()
 
-    sorted_players = sorted(data["players"], key=lambda p: p["scores"]["total"], reverse=True)
+    sorted_players = sorted(game_result["players"], key=lambda p: p["scores"]["total"], reverse=True)
     ranks = {}
     for i, player in enumerate(sorted_players):
         ranks[player["name"]] = i + 1
 
     players_with_elo = []
-    for player in data["players"]:
+    for player in game_result["players"]:
         name = player["name"]
         if name not in stats["players"]:
             stats["players"][name] = {
@@ -378,17 +385,17 @@ def add_game():
     game_index = len(stats["games"])
     stats["games"].append({
         "game_index": game_index,
-        "date": data["date"],
-        "winner": data["winner"],
+        "date": game_result["date"],
+        "winner": game_result["winner"],
         "players": [
             {**p, "rank": ranks[p["name"]],
              "elo_before": next(e["elo"] for e in players_with_elo if e["name"] == p["name"]),
              "elo_after": new_elos[p["name"]]}
-            for p in data["players"]
+            for p in game_result["players"]
         ]
     })
 
-    for player in data["players"]:
+    for player in game_result["players"]:
         name = player["name"]
         won = player["won"]
         scores = player["scores"]
@@ -409,6 +416,57 @@ def add_game():
                 p["category_totals"][category] = p["category_totals"].get(category, 0) + value
 
     save_stats(stats)
+    return new_elos
+
+def build_game_result_from_state(game_state):
+    """
+    Converts a completed server-hosted game_state into the same
+    game_result shape the desktop client already posts to /stats/add_game.
+    """
+    import datetime
+
+    sorted_players = sorted(
+        game_state["players"],
+        key=lambda p: (
+            p["score"].get("total", 0),
+            -p.get("pirate_reserve", 0),
+            p.get("barrels", 0),
+            p.get("coins", 0)
+        ),
+        reverse=True
+    )
+    winner = sorted_players[0]
+
+    game_result = {
+        "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "winner": winner["name"],
+        "players": []
+    }
+    for player in sorted_players:
+        character = player.get("character")
+        game_result["players"].append({
+            "name": player["name"],
+            "character": character["name"] if character else None,
+            "scores": {
+                "pubs": player["score"].get("pubs", 0),
+                "maps": player["score"].get("maps", 0),
+                "guards": player["score"].get("guards", 0),
+                "treasure": player["score"].get("treasure", 0),
+                "scorpions": player["score"].get("scorpions", 0),
+                "supplies": player["score"].get("supplies", 0),
+                "rendezvous": player["score"].get("rendezvous", 0),
+                "wrangle": player["score"].get("wrangle", 0),
+                "total": player["score"].get("total", 0)
+            },
+            "won": player["name"] == winner["name"]
+        })
+
+    return game_result
+
+@app.route("/stats/add_game", methods=["POST"])
+def add_game():
+    data = request.get_json()
+    new_elos = record_game_result(data)
     return Response(json.dumps({"ok": True, "new_elos": new_elos}), mimetype="application/json")
 
 @app.route("/stats/reset", methods=["POST"])
