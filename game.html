@@ -970,49 +970,60 @@ function renderTableau() {
     const tableau = gameState.tableau;
     const groups = [];
 
-    if (!tableau) {
-        panel.innerHTML = "";
-        return;
+    if (tableau.pubs?.length) {
+      groups.push({
+        cards: tableau.pubs.map(card => ({ card, category: "pubs" }))
+      });
     }
 
-    const cards = [];
+    if (tableau.maps?.length) {
+      groups.push({
+        cards: tableau.maps.map(card => ({ card, category: "maps" }))
+      });
+    }
 
-    if (tableau.pubs)
-        tableau.pubs.forEach(card =>
-            cards.push({ card, category: "pubs" })
-        );
+    if (tableau.treasure) {
+      groups.push({
+        cards: [{ card: tableau.treasure, category: "treasure" }]
+      });
+    }
 
-    if (tableau.maps)
-        tableau.maps.forEach(card =>
-            cards.push({ card, category: "maps" })
-        );
+    if (tableau.scorpion) {
+      groups.push({
+        cards: [{ card: tableau.scorpion, category: "treasure" }]
+      });
+    }
 
-    if (tableau.treasure)
-        cards.push({ card: tableau.treasure, category: "treasure" });
+    if (tableau.wrangle_bunk) {
+        groups.push({ 
+          card: tableau.wrangle_bunk, category: "wrangle" });
+    }
 
-    if (tableau.scorpion)
-        cards.push({ card: tableau.scorpion, category: "scorpion" });
+    if (tableau.wrangle_hammock) {
+        groups.push({ 
+          card: tableau.wrangle_hammock, category: "wrangle" });
+    }
 
-    if (tableau.wrangle_bunk)
-        cards.push({ card: tableau.wrangle_bunk, category: "wrangle_bunk" });
+    if (tableau.wrangle_bedroll) {
+        groups.push({ 
+          card: tableau.wrangle_bedroll, category: "wrangle" });
+    }
 
-    if (tableau.wrangle_hammock)
-        cards.push({ card: tableau.wrangle_hammock, category: "wrangle_hammock" });
-
-    if (tableau.wrangle_bedroll)
-        cards.push({ card: tableau.wrangle_bedroll, category: "wrangle_bedroll" });
-
-    panel.innerHTML = groups.map(group => `
-      <div class="tableau-group">
-        ${group.cards.map(({card, category}) => `
-            <img
-                class="tableau-card"
-                src="${cardImageUrl(category, card)}"
-                onerror="this.style.display='none'"
-            >
-        `).join("")}
-      </div>
-    `).join("");
+    panel.innerHTML = `
+        <div id="tableau-strip">
+            ${groups.map(group => `
+                <div class="tableau-group">
+                    ${group.cards.map(({ card, category }) => `
+                        <img
+                            class="tableau-card"
+                            src="${cardImageUrl(category, card)}"
+                            onerror="this.style.display='none'"
+                        >
+                    `).join("")}
+                </div>
+            `).join("")}
+        </div>
+    `;
 }
 
 // ── Scorpion / roll contest overlay ────────────────────────────────────────────
