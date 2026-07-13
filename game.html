@@ -505,6 +505,7 @@
       <canvas id="board-canvas"></canvas>
       <div id="contest-overlay">
         <div class="contest-turn" id="contest-turn-label"></div>
+        <img id="contest-die-image" style="width:60px; display:none; margin:6px auto 4px; border-radius:5px;">
         <div class="contest-progress" id="contest-progress-label"></div>
       </div>
     </div>
@@ -996,6 +997,8 @@ function renderTableau() {
         });
     }
 
+    const treasureCards = [];
+
     if (tableau.treasure) {
         groups.push({
             cards: [{
@@ -1009,8 +1012,14 @@ function renderTableau() {
         groups.push({
             cards: [{
                 card: tableau.scorpion,
-                category: "treasure"
+                category: "scorpion"
             }]
+        });
+    }
+
+    if (treasureCards.length > 0) {
+        groups.push({
+          cards: treasureCards
         });
     }
 
@@ -1104,6 +1113,17 @@ function renderContestOverlay() {
     document.getElementById("contest-turn-label").textContent = `🍺 ${rollerName}'s roll`;
     document.getElementById("contest-progress-label").innerHTML =
       `Rolling — ${participantNames}`;
+  }
+
+  // Show the actual rolled die face to everyone, not just the roller,
+  // once the roll has actually happened (i.e. we're past roll_start).
+  const dieImg = document.getElementById("contest-die-image");
+  const roll = gameState.current_roll;
+  if (gameState.phase !== "roll_start" && roll && roll.image) {
+    dieImg.src = `${SERVER}/assets/dice/${roll.image}`;
+    dieImg.style.display = "block";
+  } else {
+    dieImg.style.display = "none";
   }
 
   overlay.style.display = "block";
@@ -1425,8 +1445,17 @@ function buildActionButtons() {
       showRollResult(container);
     } else {
       const rollerName = (gameState.players[rollerIndex] || {}).name || "Someone";
-      const rollValue = gameState.current_roll ? gameState.current_roll.roll : "?";
-      container.innerHTML = `<p style="color:var(--rope);font-style:italic;text-align:center;">${rollerName} rolled a ${rollValue}...</p>`;
+      const roll = gameState.current_roll || {};
+      const label = document.createElement("p");
+      label.style.cssText = "text-align:center; color:var(--parchment); margin-bottom:10px;";
+      label.textContent = `${rollerName} rolled a ${roll.roll != null ? roll.roll : "?"}...`;
+      container.appendChild(label);
+      if (roll.image) {
+        const dieImg = document.createElement("img");
+        dieImg.src = `${SERVER}/assets/dice/${roll.image}`;
+        dieImg.style.cssText = "width:140px; display:block; margin:0 auto; border-radius:6px;";
+        container.appendChild(dieImg);
+      }
     }
     return;
   }
