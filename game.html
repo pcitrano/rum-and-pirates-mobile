@@ -1000,7 +1000,7 @@ function renderTableau() {
     const treasureCards = [];
 
     if (tableau.treasure) {
-        groups.push({
+        treasureCards.push({
             cards: [{
                 card: tableau.treasure,
                 category: "treasure"
@@ -1009,7 +1009,7 @@ function renderTableau() {
     }
 
     if (tableau.scorpion) {
-        groups.push({
+        treasureCards.push({
             cards: [{
                 card: tableau.scorpion,
                 category: "scorpion"
