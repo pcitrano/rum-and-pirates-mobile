@@ -387,7 +387,8 @@
       <input type="checkbox" id="lobby-random-start" style="width:18px;height:18px;">
       <span>Random Starting Position</span>
     </label>
-    <button class="btn btn-primary" onclick="startGame()" style="margin-top:16px;">Set Sail! ⚓</button>
+    <button id="start-sail-btn" class="btn btn-primary" onclick="startGame()" style="margin-top:16px;display:none;">Set Sail! ⚓</button>
+    <p id="waiting-for-crew" style="text-align:center;font-style:italic;color:#7a6040;margin-top:16px;">Waiting for more crew to join...</p>
   </div>
 
   <div class="ornament">✦ ✦ ✦</div>
@@ -419,13 +420,28 @@
 </div>
 
 <script>
-const SERVER = "https://rumandpirates.up.railway.app";
+const SERVER = "https://rum-and-pirates-server-production.up.railway.app";
 let socket = null;
 let myName = "";
 let myRoomId = null;
 let myPlayerIndex = 0;
 let selectedRoomId = null;
 let isHost = false;
+let expectedPlayerCount = null;
+
+function updateStartButtonVisibility(currentCount) {
+  const btn = document.getElementById("start-sail-btn");
+  const waitingMsg = document.getElementById("waiting-for-crew");
+  if (!btn) return;
+  const ready = expectedPlayerCount != null && currentCount >= expectedPlayerCount;
+  btn.style.display = ready ? "block" : "none";
+  if (waitingMsg) {
+    waitingMsg.style.display = ready ? "none" : "block";
+    waitingMsg.textContent = expectedPlayerCount != null
+      ? `Waiting for crew (${currentCount}/${expectedPlayerCount})...`
+      : "Waiting for more crew to join...";
+  }
+}
 
 function launchGame() {
   // Store in localStorage so game.html can read them
@@ -483,6 +499,7 @@ function connectSocket(callback) {
     updateLobbyPlayers([myName]);
     document.getElementById("lobby-status").textContent = "Waiting for crew to join...";
     document.getElementById("host-start-controls").style.display = "block";
+    updateStartButtonVisibility(1);
     showScreen("screen-lobby");
   });
 
@@ -501,6 +518,7 @@ function connectSocket(callback) {
 
   socket.on("player_joined", (data) => {
     updateLobbyPlayers(data.players);
+    updateStartButtonVisibility(data.players.length);
   });
 
   socket.on("state_updated", (data) => {
@@ -533,6 +551,7 @@ function hostGame() {
   setError("host-error", "");
   myName = name;
   isHost = true;
+  expectedPlayerCount = parseInt(players);
   connectSocket(() => {
     socket.emit("create_room", { name, max_players: parseInt(players), random_start: start === "random" });
   });
