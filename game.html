@@ -999,23 +999,17 @@ function renderTableau() {
 
     const treasureCards = [];
 
-    if (tableau.treasure) {
+    if (tableau.treasure)
         treasureCards.push({
-            cards: [{
-                card: tableau.treasure,
-                category: "treasure"
-            }]
+            card: tableau.treasure,
+            category: "treasure"
         });
-    }
 
-    if (tableau.scorpion) {
+    if (tableau.scorpion) 
         treasureCards.push({
-            cards: [{
-                card: tableau.scorpion,
-                category: "scorpion"
-            }]
+            card: tableau.scorpion,
+            category: "scorpion"
         });
-    }
 
     if (treasureCards.length) {
         groups.push({
