@@ -968,45 +968,74 @@ function cardImageUrl(category, card) {
 function renderTableau() {
     const panel = document.getElementById("tableau-panel");
     const tableau = gameState.tableau;
+
+    if (!tableau) {
+        panel.innerHTML = "";
+        return;
+    }
+
     const groups = [];
 
     if (tableau.pubs?.length) {
-      groups.push({
-        cards: tableau.pubs.map(card => ({ card, category: "pubs" }))
-      });
+        groups.push({
+            cards: tableau.pubs.map(card => ({
+                card,
+                category: "pubs"
+            }))
+        });
     }
 
     if (tableau.maps?.length) {
-      groups.push({
-        cards: tableau.maps.map(card => ({ card, category: "maps" }))
-      });
+        groups.push({
+            cards: tableau.maps.map(card => ({
+                card,
+                category: "maps"
+            }))
+        });
     }
 
     if (tableau.treasure) {
-      groups.push({
-        cards: [{ card: tableau.treasure, category: "treasure" }]
-      });
+        groups.push({
+            cards: [{
+                card: tableau.treasure,
+                category: "treasure"
+            }]
+        });
     }
 
     if (tableau.scorpion) {
-      groups.push({
-        cards: [{ card: tableau.scorpion, category: "treasure" }]
-      });
+        groups.push({
+            cards: [{
+                card: tableau.scorpion,
+                category: "scorpion"
+            }]
+        });
     }
 
-    if (tableau.wrangle_bunk) {
-        groups.push({ 
-          card: tableau.wrangle_bunk, category: "wrangle" });
-    }
+    const wrangleCards = [];
 
-    if (tableau.wrangle_hammock) {
-        groups.push({ 
-          card: tableau.wrangle_hammock, category: "wrangle" });
-    }
+    if (tableau.wrangle_bunk)
+        wrangleCards.push({
+            card: tableau.wrangle_bunk,
+            category: "wrangle_bunk"
+        });
 
-    if (tableau.wrangle_bedroll) {
-        groups.push({ 
-          card: tableau.wrangle_bedroll, category: "wrangle" });
+    if (tableau.wrangle_hammock)
+        wrangleCards.push({
+            card: tableau.wrangle_hammock,
+            category: "wrangle_hammock"
+        });
+
+    if (tableau.wrangle_bedroll)
+        wrangleCards.push({
+            card: tableau.wrangle_bedroll,
+            category: "wrangle_bedroll"
+        });
+
+    if (wrangleCards.length) {
+        groups.push({
+            cards: wrangleCards
+        });
     }
 
     panel.innerHTML = `
