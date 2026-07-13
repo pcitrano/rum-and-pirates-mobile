@@ -61,24 +61,27 @@
     cursor: pointer;
   }
 
-  /* ── Board area ── */
-  #board-row {
+  /* ── Game area (everything below the topbar) ── */
+  #game-area {
     flex: 1;
     display: flex;
-    flex-direction: row;
-    overflow: hidden;
+    flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
+
+  /* ── Board area ── */
   #board-wrapper {
     flex: 1;
     position: relative;
     overflow: hidden;
     touch-action: none;
     min-width: 0;
+    min-height: 0;
   }
   #board-canvas {
     position: absolute;
-    top: 190px; left: 0;
+    top: 0; left: 0;
     image-rendering: crisp-edges;
   }
 
@@ -259,10 +262,8 @@
 
   /* ── Tableau side panel ── */
   #tableau-panel {
-    position: absolute;
-    top: 115px;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
+    width: 100%;
 
     overflow-x: auto;
     overflow-y: hidden;
@@ -309,9 +310,7 @@
 
   /* ── Player status bar ── */
   #status-bar {
-    position: absolute;
-    top: 10px;         
-    left: 0;
+    flex-shrink: 0;
     width: 100%;
     height: auto;
     max-height: 120px;
@@ -493,8 +492,15 @@
     </div>
   </div>
 
-  <!-- Board + Tableau -->
-  <div id="board-row">
+  <!-- Everything below the topbar: status, tableau, then board -->
+  <div id="game-area">
+    <!-- Player status -->
+    <div id="status-bar"></div>
+
+    <!-- Tableau -->
+    <div id="tableau-panel"></div>
+
+    <!-- Board -->
     <div id="board-wrapper">
       <canvas id="board-canvas"></canvas>
       <div id="contest-overlay">
@@ -502,11 +508,7 @@
         <div class="contest-progress" id="contest-progress-label"></div>
       </div>
     </div>
-    <div id="tableau-panel"></div>
   </div>
-
-  <!-- Player status -->
-  <div id="status-bar"></div>
 </div>
 
 <!-- Action panel -->
@@ -1007,7 +1009,7 @@ function renderTableau() {
         groups.push({
             cards: [{
                 card: tableau.scorpion,
-                category: "scorpion"
+                category: "treasure"
             }]
         });
     }
@@ -1244,22 +1246,19 @@ function updateUI() {
   const wrangleActive = gameState.wrangle && gameState.wrangle.active;
 
   if (gameState.phase === "character_select") {
-    document.getElementById("board-row").style.display = "none";
-    document.getElementById("status-bar").style.display = "none";
+    document.getElementById("game-area").style.display = "none";
     document.getElementById("wrangle-screen").classList.remove("open");
     document.getElementById("action-panel").classList.remove("open");
     renderCharacterSelect();
     return;
   } else if (gameState.phase === "game_over") {
-    document.getElementById("board-row").style.display = "none";
-    document.getElementById("status-bar").style.display = "none";
+    document.getElementById("game-area").style.display = "none";
     document.getElementById("wrangle-screen").classList.remove("open");
     document.getElementById("action-panel").classList.remove("open");
     renderGameOver();
     return;
   } else if (wrangleActive) {
-    document.getElementById("board-row").style.display = "none";
-    document.getElementById("status-bar").style.display = "none";
+    document.getElementById("game-area").style.display = "none";
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
     const goOverlay = document.getElementById("game-over-overlay");
@@ -1267,8 +1266,7 @@ function updateUI() {
     renderWrangleScreen();
     return;
   } else {
-    document.getElementById("board-row").style.display = "";
-    document.getElementById("status-bar").style.display = "";
+    document.getElementById("game-area").style.display = "flex";
     document.getElementById("wrangle-screen").classList.remove("open");
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
