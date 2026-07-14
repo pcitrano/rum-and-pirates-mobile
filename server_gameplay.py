@@ -75,9 +75,12 @@ class ServerGameplay:
                     player["character"] is not None and
                     player["character"]["name"] == "Captain Sullivan the Scorpion Tamer"
                 )
-                if is_sullivan:
-                    total -= card.get("points", 0)
-                    scorpions -= card.get("points", 0)
+                if is_sullivan and len(game_state["players"] == 2):
+                    total += 1
+                    scorpions += 1
+                elif is_sullivan:
+                    total += 2
+                    scorpions += 2
                 else:
                     total += card.get("points", 0)
                     scorpions += card.get("points", 0)
@@ -209,7 +212,17 @@ class ServerGameplay:
             return True
 
         player = players[current]
-        if player["pirates"] < selected_move["cost"]:
+        character = player.get("character")
+        is_seamus = (
+            isinstance(character, dict) and
+            character.get("name") == "Captain Seamus the Shortcutter"
+        )
+        
+        cost = selected_move["cost"]
+        if is_seamus:
+            cost = min(selected_move["cost"], 3)
+
+        if player["pirates"] < cost:
             return False
 
         old_space = game_state["space_lookup"][game_state["captain_space"]]
@@ -218,7 +231,7 @@ class ServerGameplay:
             "destination_id": destination_id,
             "old_space_id": old_space["id"],
             "new_space_id": destination_id,
-            "cost": selected_move["cost"],
+            "cost": cost,
             "path": selected_move["path"]
         }
         game_state["phase"] = "confirm_move"
@@ -326,6 +339,14 @@ class ServerGameplay:
         entry_cost = entry_move["cost"]
         exit_cost = exit_move["cost"]
 
+        character = player.get("character")
+        is_seamus = (
+            isinstance(character, dict) and
+            character.get("name") == "Captain Seamus the Shortcutter"
+        )
+        if is_seamus:
+            exit_cost = min(exit_cost, 3 - entry_cost)
+
         total_cost = entry_cost + exit_cost
         if player["pirates"] < total_cost:
             return False
@@ -376,13 +397,11 @@ class ServerGameplay:
         game_state["legal_moves"] = game_state["captain_graph"].get(game_state["captain_space"]) \
             or game_state["captain_graph"].get(str(game_state["captain_space"]))
 
-        rendezvous_scored = False
         for card in player["rendezvous"]:
             if card["completed"]:
                 continue
             if self.rendezvous_check(card, new_space):
                 card["completed"] = True
-                rendezvous_scored = True
                 self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
                 break
 

@@ -314,17 +314,17 @@ class ServerGameSetup:
 
     def create_character_ids(self, num_of_players):
         characters = [
-            {"name": "Captain Duncan the Drunken", "image": "char_duncan.png"},
             {"name": "Captain Cutthroat the Cartographer", "image": "char_cutthroat.png"},
             {"name": "Captain Drake the Distiller", "image": "char_drake.png"},
-            {"name": "Captain Sterling the Scoundrel", "image": "char_sterling.png"},
-            {"name": "Captain Pete the Popular", "image": "char_pete.png"},
-            {"name": "Captain Sullivan the Scorpion Tamer", "image": "char_sullivan.png"},
-            {"name": "Captain Har the Hoarder", "image": "char_har.png"},
-            {"name": "Captain Nought the Night Owl", "image": "char_nought.png"},
-            #{"name": "Captain Argh the Alley Bandit", "image": "char_argh.png"},
+            {"name": "Captain Duncan the Drunken", "image": "char_duncan.png"},
             {"name": "Captain Fergus the Fighter", "image": "char_fergus.png"},
+            {"name": "Captain Har the Hoarder", "image": "char_har.png"},
             {"name": "Captain Midas the Master of Coin", "image": "char_midas.png"},
+            {"name": "Captain Nought the Night Owl", "image": "char_nought.png"},
+            {"name": "Captain Pete the Popular", "image": "char_pete.png"},
+            {"name": "Captain Seamus the Shortcutter", "image": "char_sterling.png"},
+            {"name": "Captain Sterling the Scoundrel", "image": "char_sterling.png"},
+            {"name": "Captain Sullivan the Scorpion Tamer", "image": "char_sullivan.png"},            
         ]
 
         random.shuffle(characters)
@@ -470,6 +470,9 @@ class ServerGameSetup:
             if character["name"] == "Captain Pete the Popular" and player["pirate_reserve"] > 0:
                 player["pirates"] += 1
                 player["pirate_reserve"] -= 1
+
+            if character["name"] == "Captain Midas the Master of Coin":
+                player["coins"] += 1
 
         game_state.pop("character_hands", None)
         game_state.pop("character_selections", None)

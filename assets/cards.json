@@ -152,8 +152,8 @@
 		{"id":136, "points":4, "image_file":"ren_supplies.jpg", "destination":"supply", "completed":false},
 		{"id":137, "points":6, "image_file":"ren_treasure.jpg", "destination":"treasure", "completed":false},
 		{"id":138, "points":6, "image_file":"ren_treasure.jpg", "destination":"treasure", "completed":false},
-		{"id":139, "points":6, "image_file":"ren_yellow_map_.jpg", "destination":"yellow_map", "completed":false},
-		{"id":140, "points":6, "image_file":"ren_yellow_map_.jpg", "destination":"yellow_map", "completed":false}
+		{"id":139, "points":6, "image_file":"ren_yellow_map.jpg", "destination":"yellow_map", "completed":false},
+		{"id":140, "points":6, "image_file":"ren_yellow_map.jpg", "destination":"yellow_map", "completed":false}
 	],
 	"wrangle_bunk": [
 		{"id":141, "points":6, "image_file":"bunk_6.jpg"},
