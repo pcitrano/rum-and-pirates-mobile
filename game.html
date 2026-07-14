@@ -341,6 +341,13 @@
   .player-barrels { color: #b0c4de; font-size: 0.85rem; }
   .player-coins { color: var(--gold-light); font-size: 0.85rem; }
   .active-crown { color: var(--gold-light); font-size: 0.9rem; }
+  .player-character {
+    margin-left: auto;
+    font-style: italic;
+    font-weight: 600;
+    color: var(--gold-light);
+    white-space: nowrap;
+  }
 
   /* ── Action panel (slide-up) ── */
   #action-panel {
@@ -1320,6 +1327,7 @@ function updateUI() {
     const boarded = player.board_position > 0;
     const boardedFlagHtml = boarded 
       ? `<span class="boarded-flag" title="On Board">🏴‍☠️</span>` : '';
+    const characterTitle = player.character?.name?.split(" ")[1] || "";
     div.innerHTML = `
       ${isActive ? '<span class="active-crown">⚓</span>' : '<span style="width:14px;display:inline-block"></span>'}
       <span class="player-name" style="color:${colorCss}">${player.name}</span>
@@ -1328,6 +1336,7 @@ function updateUI() {
       <span class="player-barrels">🛢 ${player.barrels || 0}</span>
       ${coinsHtml}
       ${scoreHtml}
+      ${characterTitle ? `<span class="player-character">${characterTitle}</span>` : ""}
     `;
     bar.appendChild(div);
   });
