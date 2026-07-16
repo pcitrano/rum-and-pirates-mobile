@@ -865,7 +865,9 @@ class ServerGameplay:
         is_dark = space["type"] == "dark_alley"
 
         if is_dark != reclaim_1["is_dark_alley"]:
-            game_state["phase"] = "reclaim_fail"
+            game_state["reclaim_1"] = None
+            game_state["reclaim_2"] = None
+            game_state["phase"] = "reclaim_1"
             return False
 
         if is_dark:
@@ -879,7 +881,9 @@ class ServerGameplay:
                 if path["start"] == space_id or path["destination"] == space_id:
                     game_state["reclaim_2"] = {"space_id": space_id, "path_index": i}
                     return self.resolve_reclaim(game_state)
-            game_state["phase"] = "reclaim_fail"
+            game_state["reclaim_1"] = None
+            game_state["reclaim_2"] = None
+            game_state["phase"] = "reclaim_1"
             return False
         else:
             # Must be the OTHER endpoint of the SAME connected path.
@@ -887,7 +891,9 @@ class ServerGameplay:
             if space_id != reclaim_1["space_id"] and (path["start"] == space_id or path["destination"] == space_id):
                 game_state["reclaim_2"] = {"space_id": space_id, "path_index": reclaim_1["path_index"]}
                 return self.resolve_reclaim(game_state)
-            game_state["phase"] = "reclaim_fail"
+            game_state["reclaim_1"] = None
+            game_state["reclaim_2"] = None
+            game_state["phase"] = "reclaim_1"
             return False
 
     def resolve_reclaim(self, game_state):
@@ -918,16 +924,6 @@ class ServerGameplay:
         game_state["phase"] = "post_move"
         self.refresh_legal_moves(game_state)
         return True
-
-    def resolve_reclaim_fail(self, game_state):
-        game_state["reclaim_1"] = None
-        game_state["reclaim_2"] = None
-        game_state["phase"] = "post_move"
-
-    def skip_reclaim(self, game_state):
-        game_state["reclaim_1"] = None
-        game_state["reclaim_2"] = None
-        game_state["phase"] = "post_move"
 
     # ── Wrangle ────────────────────────────────────────────────────────
     def active_players(self, game_state):

@@ -94,7 +94,7 @@
     border: 3px solid var(--gold);
     border-radius: 14px;
     padding: 16px 32px;
-    z-index: 500;
+    z-index: 15;
     text-align: center;
     display: none;
     white-space: nowrap;
@@ -1013,15 +1013,15 @@ function renderTableau() {
             category: "treasure"
         });
 
-    if (tableau.scorpion) 
+    if (tableau.scorpion)
         treasureCards.push({
             card: tableau.scorpion,
-            category: "scorpion"
+            category: "treasure"
         });
 
     if (treasureCards.length) {
         groups.push({
-          cards: treasureCards
+            cards: treasureCards
         });
     }
 
@@ -1191,8 +1191,11 @@ function renderWrangleScreen() {
       </div>
     </div>
     <div class="wrangle-status">
-      <p>Rolling: ${rollerName}</p>
       <p>Leader: ${leaderHtml}</p>
+      <p>Rolling: ${rollerName}</p>
+      ${gameState.phase !== "roll_start" && gameState.current_roll && gameState.current_roll.image
+        ? `<img src="${SERVER}/assets/dice/${gameState.current_roll.image}" style="width:70px;display:block;margin:8px auto;border-radius:6px;">`
+        : ""}
     </div>
   `;
 }
@@ -1564,22 +1567,6 @@ function buildActionButtons() {
       ? "Tap the first space to reclaim pirates from."
       : "Now tap a second space to complete the reclaim.";
     container.appendChild(label);
-    addActionBtn(container, "Skip Reclaim", "secondary", () => {
-      socket.emit("player_action", { room_id: myRoomId, type: "skip_reclaim", player_index: myPlayerIndex });
-      closeActionPanel();
-    });
-    return;
-  }
-
-  if (phase === "reclaim_fail") {
-    const label = document.createElement("p");
-    label.style.cssText = "text-align:center; color:var(--red); margin-bottom:12px;";
-    label.textContent = "Those spaces don't connect — no pirates reclaimed.";
-    container.appendChild(label);
-    addActionBtn(container, "Continue", "", () => {
-      socket.emit("player_action", { room_id: myRoomId, type: "acknowledge_reclaim_fail", player_index: myPlayerIndex });
-      closeActionPanel();
-    });
     return;
   }
 
@@ -1860,6 +1847,10 @@ function connectToGame(name, roomId, playerIndex) {
     setLoading("Waiting for game state...");
   });
 
+  socket.on("error", (data) => {
+    showToast(data.message || "Something went wrong.");
+  });
+
   socket.on("state_updated", (data) => {
     gameState = data.game_state;
 
@@ -1923,7 +1914,7 @@ function connectToGame(name, roomId, playerIndex) {
     if ((gameState.phase === "guard_start" || gameState.phase === "guard_battle") && gameState.active_player === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
-    if ((gameState.phase === "reclaim_1" || gameState.phase === "reclaim_2" || gameState.phase === "reclaim_fail") && gameState.active_player === myPlayerIndex) {
+    if ((gameState.phase === "reclaim_1" || gameState.phase === "reclaim_2") && gameState.active_player === myPlayerIndex) {
       document.getElementById("action-panel").classList.add("open");
     }
 

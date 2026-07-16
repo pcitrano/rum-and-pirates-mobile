@@ -212,15 +212,11 @@ def on_player_action(data):
                 return
         elif game_state["phase"] == "reclaim_2":
             success = gameplay.try_reclaim_2(game_state, space_id)
-            if not success and game_state["phase"] != "reclaim_fail":
-                emit("error", {"message": "That doesn't complete a valid reclaim."})
+            if not success:
+                emit("error", {"message": "Invalid selection - choose again."}, room=room_id)
+                rooms[room_id]["game_state"] = game_state
+                socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
                 return
-
-    elif action_type == "acknowledge_reclaim_fail":
-        gameplay.resolve_reclaim_fail(game_state)
-
-    elif action_type == "skip_reclaim":
-        gameplay.skip_reclaim(game_state)
 
     else:
         # Not yet migrated — relay to other clients (e.g. desktop host)
