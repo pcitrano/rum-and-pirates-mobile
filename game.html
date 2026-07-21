@@ -1836,15 +1836,17 @@ function connectToGame(name, roomId, playerIndex) {
   setLoading("Connecting to game...");
   socket = io(SERVER, { transports: ["websocket"] });
 
+  // Cleanly notify server if browser tab is closed/refreshed
   window.addEventListener("beforeunload", () => {
-  if (socket && socket.connected) {
-    socket.disconnect();
-  }
-});
+    if (socket && socket.connected) {
+      socket.disconnect();
+    }
+  });
 
   socket.on("connect", () => {
     setLoading("Joining room...");
-    socket.emit("join_room", { room_id: roomId, name });
+    // Emit rejoin_room to claim an existing slot in an active game session
+    socket.emit("rejoin_room", { room_id: roomId, name });
   });
 
   socket.on("room_joined", (data) => {
@@ -1852,12 +1854,27 @@ function connectToGame(name, roomId, playerIndex) {
     setLoading("Waiting for game state...");
   });
 
+  socket.on("rejoined", (data) => {
+    if (data.player_index !== undefined) {
+      myPlayerIndex = data.player_index;
+    }
+    setLoading("Waiting for game state...");
+  });
+
+  socket.on("rejoin_error", (data) => {
+    showToast(data.message || "Failed to rejoin room.");
+    hideLoading();
+  });
+
   socket.on("error", (data) => {
     showToast(data.message || "Something went wrong.");
   });
 
   socket.on("state_updated", (data) => {
-    gameState = data.game_state;
+    // Handle state whether payload is nested under data.game_state or direct
+    gameState = data.game_state || data;
+
+    if (!gameState) return;
 
     // Always resolve player index by name — seat order can shuffle server-side
     if (gameState.players && myName) {
@@ -1889,6 +1906,7 @@ function connectToGame(name, roomId, playerIndex) {
       spaceLoookup = spaceLookup;
       needsBoardSizing = true;
     }
+
     updateUI();
     buildActionButtons();
 
@@ -1932,10 +1950,9 @@ function connectToGame(name, roomId, playerIndex) {
     hideLoading();
   });
 
+  // Alias legacy state update event to state_updated handler logic
   socket.on("game_state_update", (gs) => {
-    gameState = gs;
-    updateUI();
-    hideLoading();
+    socket.listeners("state_updated")[0]({ game_state: gs });
   });
 
   socket.on("action_received", (data) => {

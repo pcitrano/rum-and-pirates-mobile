@@ -332,17 +332,24 @@ def on_rejoin_room(data):
         return
 
     room = rooms[room_id]
-    player = next((p for p in room["players"] if p["name"] == name), None)
+    player_index = next((i for i, p in enumerate(room["players"]) if p["name"] == name), None)
 
-    if player is None:
+    if player_index is None:
         emit("rejoin_error", {"message": "Player not found in this game"})
         return
 
-    player["sid"] = request.sid
-    player["connected"] = True
+    room["players"][player_index]["sid"] = request.sid
+    room["players"][player_index]["connected"] = True
     join_room(room_id)
-    emit("rejoined", {"room_id": room_id})
-    emit("game_state_update", room["game_state"])
+    
+    # Send rejoin confirmation along with player_index
+    emit("rejoined", {"room_id": room_id, "player_index": player_index})
+    
+    # Broadcast or emit game state if active
+    if room["game_state"]:
+        emit("state_updated", {"game_state": room["game_state"]})
+    
+    socketio.emit("player_reconnected", {"name": name}, room=room_id)
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 

@@ -535,9 +535,10 @@ function connectSocket(callback) {
 
   socket.on("rejoined", (data) => {
     myRoomId = data.room_id;
-    document.getElementById("lobby-code").textContent = data.room_id;
-    document.getElementById("lobby-status").textContent = "Rejoined! Waiting for the game to continue...";
-    showScreen("screen-lobby");
+    myPlayerIndex = data.player_index;
+  
+    // 🚀 Immediately launch game view on rejoin
+    launchGame();
   });
 
   socket.on("rejoin_error", (data) => {
