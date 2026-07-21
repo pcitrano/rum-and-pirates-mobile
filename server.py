@@ -49,10 +49,12 @@ def get_rooms():
     open_rooms = []
     for room_id, room in rooms.items():
         if room["game_state"] is None:
-            open_rooms.append({
-                "room_id": room_id,
-                "players": [p["name"] for p in room["players"] if p.get("connected")]
-            })
+            connected_players = [p["name"] for p in room["players"] if p.get("connected")]
+            if connected_players:  # Only show rooms with at least one active player
+                open_rooms.append({
+                    "room_id": room_id,
+                    "players": connected_players
+                })
     return Response(json.dumps(open_rooms), mimetype="application/json")
 
 @app.route("/games")
@@ -60,10 +62,17 @@ def get_games():
     active_games = []
     for room_id, room in rooms.items():
         game_state = room.get("game_state")
+        # Keep game listed as long as it's active (not game_over)
         if game_state is not None and game_state.get("phase") != "game_over":
             active_games.append({
                 "room_id": room_id,
-                "players": [p["name"] for p in room["players"]]
+                "players": [
+                    {
+                        "name": p["name"],
+                        "connected": p.get("connected", False)
+                    }
+                    for p in room["players"]
+                ]
             })
     return Response(json.dumps(active_games), mimetype="application/json")
 
@@ -90,7 +99,7 @@ def on_join_room(data):
 
     # Check for rejoin
     for i, player in enumerate(rooms[room_id]["players"]):
-        if player["name"] == data["name"] and not player["connected"]:
+        if player["name"] == data["name"]:
             rooms[room_id]["players"][i]["sid"] = request.sid
             rooms[room_id]["players"][i]["connected"] = True
             join_room(room_id)
@@ -306,6 +315,11 @@ def on_disconnect():
                 print(f"[server] {player['name']} disconnected from room {room_id}")
                 room["disconnected"][i] = player
                 room["players"][i]["connected"] = False
+                socketio.emit("player_disconnected", {
+                    "name": player["name"],
+                    "player_index": i,
+                    "players": [p["name"] for p in room["players"] if p.get("connected")]
+                }, room=room_id)
                 break
 
 @socketio.on("rejoin_room")

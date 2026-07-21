@@ -489,6 +489,13 @@ function showScreen(id) {
 function connectSocket(callback) {
   if (socket && socket.connected) { callback(); return; }
   socket = io(SERVER, { transports: ["websocket"] });
+
+  window.addEventListener("beforeunload", () => {
+    if (socket && socket.connected) {
+      socket.disconnect();
+    }
+  });
+
   socket.on("connect", () => { console.log("Connected"); callback(); });
   socket.on("connect_error", () => setError("host-error", "Could not reach the server."));
 
@@ -634,6 +641,7 @@ function openActiveGames() {
 function fetchActiveGames() {
   const list = document.getElementById("active-room-list");
   list.innerHTML = '<p class="room-empty"><span class="spinner"></span> Scanning the seas...</p>';
+  
   fetch(`${SERVER}/games`)
     .then(r => r.json())
     .then(games => {
@@ -643,12 +651,22 @@ function fetchActiveGames() {
       }
       list.innerHTML = "";
       const myStoredName = (loadSettings().name || "").toLowerCase();
+
       games.forEach(game => {
         const row = document.createElement("div");
         row.className = "room-row";
-        const inGame = game.players.some(p => p.toLowerCase() === myStoredName);
+        
+        const inGame = game.players.some(p => p.name.toLowerCase() === myStoredName);
         if (inGame) row.classList.add("selected");
-        row.innerHTML = `<span class="room-code">${game.room_id}</span><span class="room-meta">${game.players.join(", ")}</span>`;
+
+        // Format players with online/offline indicators
+        const playerMarkup = game.players.map(p => {
+          const color = p.connected ? "#4caf50" : "#888";
+          const label = p.connected ? "" : " (offline)";
+          return `<span style="color: ${color};">${p.name}${label}</span>`;
+        }).join(", ");
+
+        row.innerHTML = `<span class="room-code">${game.room_id}</span><span class="room-meta">${playerMarkup}</span>`;
         row.onclick = () => rejoinGame(game.room_id);
         list.appendChild(row);
       });

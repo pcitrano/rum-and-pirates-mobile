@@ -1109,7 +1109,16 @@ class ServerGameplay:
         ranking = [winner_index] + eliminated_players
         participants = len(ranking)
 
-        if len(game_state["players"]) <= 3:
+        if len(game_state["players"]) == 2:  # in 3 player give 2nd place the bedroll
+            if participants == 1:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+            else:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the bedroll.")
+        elif len(game_state["players"]) == 3:
             if participants == 1:
                 game_state["players"][ranking[0]]["wrangles"].append(card_1)
                 self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")

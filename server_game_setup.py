@@ -322,7 +322,7 @@ class ServerGameSetup:
             {"name": "Captain Midas the Master of Coin", "image": "char_midas.png"},
             {"name": "Captain Nought the Night Owl", "image": "char_nought.png"},
             {"name": "Captain Pete the Popular", "image": "char_pete.png"},
-            {"name": "Captain Seamus the Shortcutter", "image": "char_sterling.png"},
+            {"name": "Captain Seamus the Shortcutter", "image": "char_seamus.png"},
             {"name": "Captain Sterling the Scoundrel", "image": "char_sterling.png"},
             {"name": "Captain Sullivan the Scorpion Tamer", "image": "char_sullivan.png"},            
         ]

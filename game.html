@@ -789,7 +789,6 @@ canvas.addEventListener("pointerup", e => {
   if (dx < 8 && dy < 8) handleBoardTap(e.clientX, e.clientY);
   isPanning = false;
 });
-
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.1 : 0.9;
@@ -1836,6 +1835,12 @@ function connectToGame(name, roomId, playerIndex) {
 
   setLoading("Connecting to game...");
   socket = io(SERVER, { transports: ["websocket"] });
+
+  window.addEventListener("beforeunload", () => {
+  if (socket && socket.connected) {
+    socket.disconnect();
+  }
+});
 
   socket.on("connect", () => {
     setLoading("Joining room...");
