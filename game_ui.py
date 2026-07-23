@@ -6,7 +6,6 @@ import json
 import copy
 import sys
 from network import network_manager
-from moviepy import VideoFileClip
 import os
 
 SERVER_URL = "https://rumandpirates.up.railway.app"
@@ -45,7 +44,7 @@ class Button:
             x = self.rect.centerx - rendered.get_width() // 2
             screen.blit(rendered, (x, y))
             y += font.get_linesize()
-    
+
     def draw_transparent(self, screen, font):
 
         button_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
@@ -229,8 +228,6 @@ class game_ui:
             
             if self.show_splash and pygame.time.get_ticks() - self.splash_start_time > 5000:
                 self.show_splash = False
-               # self.draw_intro_movie()
-                #self.play_menu_music()
             self.poll_network()
             self.draw()
 
@@ -469,7 +466,7 @@ class game_ui:
             else:
                 self.game_state["menu"]["player_names"][field] = self.game_state["menu"]["player_names"][field][:-1]
         
-        elif len(event.unicode) == 1:
+        elif len(event.unicode) == 1 and event.unicode.isprintable():
             if field == "room_code":
                 self.game_state["menu"]["room_code_input"] += event.unicode.upper()
             elif field == "chat":
@@ -631,7 +628,7 @@ class game_ui:
         else:
             self.screen.blit(menu_image, (0, 0))
 
-        version_text = "Ver 2.13"
+        version_text = "Ver 2.20"
         version_label = self.font.render(version_text, True, (255, 255, 255))
         self.screen.blit(version_label, (1450/1600*self.width, 850/900*self.height))
 
