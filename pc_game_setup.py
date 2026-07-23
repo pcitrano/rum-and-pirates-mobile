@@ -86,10 +86,12 @@ class game_setup:
                 if (dx*dx + dy*dy) ** 0.5 < MAX_DIST:
                     mid_x        = int((space_a["board_x"] + space_b["board_x"]) / 2)
                     mid_y        = int((space_a["board_y"] + space_b["board_y"]) / 2)
-                    neighbor_ids = list(set(
+                    _raw = (
                         [n for n in space_a["neighbors"] if n != space_b["id"]] +
                         [n for n in space_b["neighbors"] if n != space_a["id"]]
-                    ))
+                    )
+                    seen = set()
+                    neighbor_ids = [n for n in _raw if not (n in seen or seen.add(n))]
                     new_space = {
                         "id": next_space_id, "type": "normal",
                         "tile_num": None, "board_x": mid_x, "board_y": mid_y,
