@@ -2,7 +2,7 @@ import json
 import os
 import requests
 
-SERVER_URL = "https://rum-and-pirates-server-production.up.railway.app"
+SERVER_URL = "https://rumandpirates.up.railway.app"
 
 class save_data:
     def __init__(self):
@@ -24,7 +24,7 @@ class save_data:
             "wrangle_view": "Classic",
             "random_start": False,
             "play_with_characters": False,
-            "server_ip": "rum-and-pirates-server-production.up.railway.app"
+            "server_ip": "rumandpirates.up.railway.app"
         }
         if os.path.exists(self.settings_path):
             try:

@@ -351,6 +351,17 @@ def on_rejoin_room(data):
     
     socketio.emit("player_reconnected", {"name": name}, room=room_id)
 
+@socketio.on("chat")
+def on_chat(data):
+    room_id = data.get("room_id")
+    text = data.get("text", "").strip()
+    if not room_id or not text or room_id not in rooms:
+        return
+    room = rooms[room_id]
+    # Identify sender by SID
+    sender = next((p["name"] for p in room["players"] if p.get("sid") == request.sid), "?")
+    socketio.emit("chat", {"player": sender, "text": text}, room=room_id)
+
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
 def load_stats():

@@ -62,6 +62,7 @@ class network_manager:
         @self.sio.on("rejoined")
         def on_rejoined(data):
             self.room_id = data["room_id"]
+            self.player_index = data.get("player_index")
             self.reconnected = True
         
         @self.sio.on("rejoin_error")
@@ -92,23 +93,6 @@ class network_manager:
 
     def start_game(self, game_state):
         self.sio.emit("start_game", {"room_id": self.room_id, "game_state": game_state})
-
-    def new_game(self, play_with_characters=False, random_start=False):
-        """Ask the server to generate a fresh game state for the current room."""
-        self.sio.emit("new_game", {
-            "room_id": self.room_id,
-            "play_with_characters": play_with_characters,
-            "random_start": random_start,
-        })
-
-    def confirm_character(self, player_index, selected_name, random_start=False):
-        """Submit a character selection to the server."""
-        self.sio.emit("confirm_character", {
-            "room_id": self.room_id,
-            "player_index": player_index,
-            "selected_name": selected_name,
-            "random_start": random_start,
-        })
 
     def reconnect(self, server_url, room_id, player_name):
         try:

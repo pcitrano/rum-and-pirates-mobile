@@ -2660,7 +2660,7 @@ class game_ui:
 
     def rest(self):
         self.send_action({"type": "rest"})
-    
+
     def cancel_boarding(self):
         # Boarding confirmation is local UI state only; just rebuild buttons.
         self.game_state["phase"] = "start_turn"
@@ -2987,6 +2987,8 @@ class game_ui:
 
         if self.network.reconnected:
             self.network.reconnected = False
+            self.room_id = self.network.room_id
+            self.my_player_index = None
             if self.network.incoming_state:
                 self.apply_network_state(self.network.incoming_state)
                 self.network.incoming_state = None
@@ -2996,7 +2998,8 @@ class game_ui:
             self.network.join_error = False
             self.game_state["menu"]["lobby_error"] = getattr(self.network, "join_error_message", "Could not rejoin game")
 
-    def apply_network_state(self, state):     
+    def apply_network_state(self, state):
+        
         local_menu = self.game_state.get("menu")
 
         CLIENT_ONLY_KEYS = {"spaces", "space_lookup", "board"}
@@ -3047,10 +3050,14 @@ class game_ui:
                         break
 
         if "players" in state and self.network is not None:
-            my_name = self.game_state["menu"]["player_names"][0]
-            for i, player in enumerate(state["players"]):
-                if player["name"] == my_name:
-                    self.my_player_index = i
-                    break
+            my_name = (
+                self.save_data.settings.get("player_name", "").strip()
+                or self.game_state["menu"]["player_names"][0]
+            )
+            if my_name:
+                for i, player in enumerate(state["players"]):
+                    if player["name"].strip().lower() == my_name.lower():
+                        self.my_player_index = i
+                        break
 
         self.build_buttons()
