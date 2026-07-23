@@ -2999,7 +2999,8 @@ class game_ui:
         
         local_menu = self.game_state.get("menu")
 
-        CLIENT_ONLY_KEYS = {"spaces", "space_lookup", "board"}
+        # legal_moves and occupied_paths are normalised below with int casting
+        CLIENT_ONLY_KEYS = {"spaces", "space_lookup", "board", "legal_moves", "occupied_paths"}
         for key, value in state.items():
             if key not in CLIENT_ONLY_KEYS:
                 self.game_state[key] = value
@@ -3007,11 +3008,35 @@ class game_ui:
         if local_menu is not None:
             self.game_state["menu"] = local_menu
 
-        ### Reset indicies to use integers
+        ### Reset indices to use integers
+        if "captain_space" in state:
+            self.game_state["captain_space"] = int(state["captain_space"])
+        if "active_player" in state:
+            self.game_state["active_player"] = int(state["active_player"])
         if "captain_graph" in state:
             self.game_state["captain_graph"] = {
                 int(k): v for k, v in state["captain_graph"].items()
-            }    
+            }
+
+        if "legal_moves" in state:
+            normalised = []
+            for move in state["legal_moves"]:
+                m = dict(move)
+                if "destination" in m:
+                    m["destination"] = int(m["destination"])
+                if "path" in m:
+                    m["path"] = [int(p) for p in m["path"]]
+                normalised.append(m)
+            self.game_state["legal_moves"] = normalised
+
+        if "occupied_paths" in state:
+            for path in self.game_state.get("occupied_paths", []):
+                if "path" in path:
+                    path["path"] = [int(p) for p in path["path"]]
+                if "start" in path:
+                    path["start"] = int(path["start"])
+                if "destination" in path:
+                    path["destination"] = int(path["destination"])
 
         if "alley_lookup" in state:
             self.game_state["alley_lookup"] = {

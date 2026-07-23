@@ -74,6 +74,8 @@ class game_setup:
         edge_spaces       = [s for s in all_spaces if s["type"] == "edge"]
         spaces_to_remove  = set()
         new_spaces        = []
+        # Sort by ID so merge order is identical on server and client.
+        edge_spaces.sort(key=lambda s: s["id"])
         next_space_id     = max(s["id"] for s in all_spaces) + 1
         MAX_DIST          = 80
 

@@ -141,6 +141,12 @@ def on_player_action(data):
 
     game_state = rooms[room_id]["game_state"]
 
+    # Normalise integer IDs that JSON may have coerced to strings
+    if "captain_space" in game_state:
+        game_state["captain_space"] = int(game_state["captain_space"])
+    if "active_player" in game_state:
+        game_state["active_player"] = int(game_state["active_player"])
+
     if action_type == "move":
         destination_id = data.get("destination_id")
         result = gameplay.move_captain(game_state, destination_id)
@@ -350,17 +356,6 @@ def on_rejoin_room(data):
         emit("state_updated", {"game_state": room["game_state"]})
     
     socketio.emit("player_reconnected", {"name": name}, room=room_id)
-
-@socketio.on("chat")
-def on_chat(data):
-    room_id = data.get("room_id")
-    text = data.get("text", "").strip()
-    if not room_id or not text or room_id not in rooms:
-        return
-    room = rooms[room_id]
-    # Identify sender by SID
-    sender = next((p["name"] for p in room["players"] if p.get("sid") == request.sid), "?")
-    socketio.emit("chat", {"player": sender, "text": text}, room=room_id)
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 

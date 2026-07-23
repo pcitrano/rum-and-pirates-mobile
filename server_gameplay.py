@@ -538,12 +538,14 @@ class ServerGameplay:
         game_state["scorpion_contest"]["total"] += roll_value
  
         if game_state["scorpion_contest"]["total"] >= game_state["scorpion_contest"]["target"]:
-            player["scorpions"].append(card)
-            self.log_action(game_state, f"Ouch! {player['name']} got stung!")
-            game_state["scorpion_contest"]["contest_active"] = False
-            game_state["tableau"]["scorpion"] = game_state["decks"]["scorpions"].pop()
-            game_state["phase"] = "post_move"
-            self.score_players(game_state)
+            # Guard against double-apply if a client reconnects and resends confirm_roll
+            if game_state["scorpion_contest"].get("contest_active", True):
+                player["scorpions"].append(card)
+                self.log_action(game_state, f"Ouch! {player['name']} got stung!")
+                game_state["scorpion_contest"]["contest_active"] = False
+                game_state["tableau"]["scorpion"] = game_state["decks"]["scorpions"].pop()
+                game_state["phase"] = "post_move"
+                self.score_players(game_state)
         else:
             next_player = (player_id + 1) % len(game_state["players"])
             game_state["scorpion_contest"]["player_index"] = next_player
@@ -1192,14 +1194,12 @@ class ServerGameplay:
             self.roll_start(game_state, player_id)
  
     def resolve_roll(self, game_state):
-        """
-        Accepts the current roll and dispatches based on what triggered it.
-        Only the treasure/scorpion contest is migrated so far — wrangle and
-        Fergus's guard roll are left alone (not yet server-side), and any
-        other roll type just falls through safely.
-        """
-        captain_space = game_state["captain_space"]
-        space_type = game_state["space_lookup"][captain_space]["type"]
+        # Normalise to int: JSON round-trips can turn int keys into strings
+        captain_space = int(game_state["captain_space"])
+        game_state["captain_space"] = captain_space
+        space_lookup = game_state["space_lookup"]
+        space = space_lookup.get(captain_space) or space_lookup.get(str(captain_space))
+        space_type = space["type"] if space else None
         player_id = game_state["current_roll"]["player"]
         game_state["players"][player_id]["free_rerolls"] = 0
  
