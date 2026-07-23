@@ -118,7 +118,8 @@ class ServerGameSetup:
                     for nid in space_b["neighbors"]:
                         if nid != space_a["id"]:
                             neighbor_ids.append(nid)
-                    neighbor_ids = list(set(neighbor_ids))
+                    seen = set()
+                    neighbor_ids = [n for n in neighbor_ids if not (n in seen or seen.add(n))]
 
                     new_space = {
                         "id": next_space_id,
