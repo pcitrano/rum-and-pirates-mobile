@@ -211,8 +211,8 @@ class game_ui:
         self.chat_read_messages = None
         self.chat_notification = False
 
-        self.rules.broadcast = self.broadcast_state
-        self.rules.broadcast = self.broadcast_state
+        if self.rules is not None:
+            self.rules.broadcast = self.broadcast_state
 
     def run(self):
         clock = pygame.time.Clock()
@@ -794,12 +794,14 @@ class game_ui:
                 for i, game in enumerate(active_games[:6]):
                     rid = game.get("room_id", "???")
                     players = game.get("players", [])
+                    # players is a list of {"name": ..., "connected": ...} dicts
+                    player_names = [p["name"] if isinstance(p, dict) else p for p in players]
                     # Highlight games the player is already in
-                    in_game = any(p.lower() == my_name for p in players)
+                    in_game = any(n.lower() == my_name for n in player_names)
                     row_rect = pygame.Rect(base_x, list_y + i * (row_h + 4), box_width, row_h)
                     row_color = (200, 180, 80) if in_game else (80, 80, 80)
                     pygame.draw.rect(self.screen, row_color, row_rect, border_radius=4)
-                    player_str = ", ".join(players)
+                    player_str = ", ".join(player_names)
                     row_text = f"{rid}   {player_str}"
                     row_label = self.font.render(row_text, True, (0, 0, 0))
                     self.screen.blit(row_label, (row_rect.x + 10, row_rect.y + (row_h - row_label.get_height()) // 2))
@@ -1209,72 +1211,8 @@ class game_ui:
             self.draw_wrangle_setup()
 
         else:
-            if self.board_surface is not None:
-                self.screen.blit(self.board_surface, (self.board_x, 98/750*self.height))
-
-                ############ Scalable Space Locations ##########
-                scale_x = self.board_width / self.ORIGINAL_BOARD_SIZE
-                scale_y = self.board_height / self.ORIGINAL_BOARD_SIZE
-                board_y = self.board_y
-        
-                ################## Pirates ####################
-                for occupied_path in self.game_state["occupied_paths"]:
-                    player = next(p for p in self.game_state["players"] if p["id"] == occupied_path["player_id"])
-                    color = player["color"]
-
-                    for space_id in occupied_path["path"]:
-                        space = self.game_state["space_lookup"][space_id]
-                        screen_x = self.board_x + int(space["board_x"] * scale_x)
-                        screen_y = int(space["board_y"] * scale_y) + board_y
-                        radius = max(4, int(8 * min(scale_x, scale_y)))
-                        pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius)
-
-                pending = self.game_state.get("pending_move")
-                dark_alley_1 = self.game_state.get("dark_alley_1")
-                dark_alley_2 = self.game_state.get("dark_alley_2")
-
-                if pending or dark_alley_1 or dark_alley_2:
-                    player = self.game_state["players"][self.game_state["active_player"]]
-                    color = player["color"]
-                    if pending:
-                        for space_id in pending["path"]:
-                            space = self.game_state["space_lookup"][space_id]
-                            screen_x = self.board_x + int(space["board_x"] * scale_x)
-                            screen_y = int(space["board_y"] * scale_y) + board_y
-                            radius = max(4, int(8 * min(scale_x, scale_y)))
-                            pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
-                    if dark_alley_1:
-                        for space_id in dark_alley_1["path"]:
-                            space = self.game_state["space_lookup"][space_id]
-                            screen_x = self.board_x + int(space["board_x"] * scale_x)
-                            screen_y = int(space["board_y"] * scale_y) + board_y
-                            radius = max(4, int(8 * min(scale_x, scale_y)))
-                            pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
-                    if dark_alley_2:
-                        for space_id in dark_alley_2["path"]:
-                            space = self.game_state["space_lookup"][space_id]
-                            screen_x = self.board_x + int(space["board_x"] * scale_x)
-                            screen_y = int(space["board_y"] * scale_y) + board_y
-                            radius = max(4, int(8 * min(scale_x, scale_y)))
-                            pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
-                    # Draw preview captain position
-                    if pending or dark_alley_2:
-                        if pending:
-                            dest_space = self.game_state["space_lookup"][pending["destination_id"]]
-                        else:
-                            dest_space = self.game_state["space_lookup"][dark_alley_2["final_space"]]
-                        screen_x = self.board_x + int(dest_space["board_x"] * scale_x)
-                        screen_y = int(dest_space["board_y"] * scale_y) + board_y
-                        radius = max(8, int(15 * min(scale_x, scale_y)))
-                        pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), radius, 3)
-
-                ################## Captain ####################
-                captain_space = self.game_state["captain_space"]
-                space_id = self.game_state["space_lookup"][captain_space]
-                screen_x = self.board_x + int(space_id["board_x"] * scale_x)
-                screen_y = int(space_id["board_y"] * scale_y) + board_y
-                radius = max(8, int(15 * min(scale_x, scale_y)))
-                pygame.draw.circle(self.screen,(255,0,0),(screen_x, screen_y), radius)
+            if self.board_surface is not None and self.game_state.get("space_lookup"):
+                self.draw_board()
         
         ################## Panels ####################
         self.draw_tableau()    # right
@@ -1303,6 +1241,73 @@ class game_ui:
             self.draw_inventory_info()
         if self.chat_open:
             self.draw_chat()
+
+    def draw_board(self):
+        self.screen.blit(self.board_surface, (self.board_x, 98/750*self.height))
+
+        ############ Scalable Space Locations ##########
+        scale_x = self.board_width / self.ORIGINAL_BOARD_SIZE
+        scale_y = self.board_height / self.ORIGINAL_BOARD_SIZE
+        board_y = self.board_y
+        
+        ################## Pirates ####################
+        for occupied_path in self.game_state["occupied_paths"]:
+            player = next(p for p in self.game_state["players"] if p["id"] == occupied_path["player_id"])
+            color = player["color"]
+
+            for space_id in occupied_path["path"]:
+                space = self.game_state["space_lookup"][space_id]
+                screen_x = self.board_x + int(space["board_x"] * scale_x)
+                screen_y = int(space["board_y"] * scale_y) + board_y
+                radius = max(4, int(8 * min(scale_x, scale_y)))
+                pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius)
+
+        pending = self.game_state.get("pending_move")
+        dark_alley_1 = self.game_state.get("dark_alley_1")
+        dark_alley_2 = self.game_state.get("dark_alley_2")
+
+        if pending or dark_alley_1 or dark_alley_2:
+            player = self.game_state["players"][self.game_state["active_player"]]
+            color = player["color"]
+            if pending:
+                for space_id in pending["path"]:
+                    space = self.game_state["space_lookup"][space_id]
+                    screen_x = self.board_x + int(space["board_x"] * scale_x)
+                    screen_y = int(space["board_y"] * scale_y) + board_y
+                    radius = max(4, int(8 * min(scale_x, scale_y)))
+                    pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
+            if dark_alley_1:
+                for space_id in dark_alley_1["path"]:
+                    space = self.game_state["space_lookup"][space_id]
+                    screen_x = self.board_x + int(space["board_x"] * scale_x)
+                    screen_y = int(space["board_y"] * scale_y) + board_y
+                    radius = max(4, int(8 * min(scale_x, scale_y)))
+                    pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
+            if dark_alley_2:
+                for space_id in dark_alley_2["path"]:
+                    space = self.game_state["space_lookup"][space_id]
+                    screen_x = self.board_x + int(space["board_x"] * scale_x)
+                    screen_y = int(space["board_y"] * scale_y) + board_y
+                    radius = max(4, int(8 * min(scale_x, scale_y)))
+                    pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius, 2)
+            # Draw preview captain position
+            if pending or dark_alley_2:
+                if pending:
+                    dest_space = self.game_state["space_lookup"][pending["destination_id"]]
+                else:
+                    dest_space = self.game_state["space_lookup"][dark_alley_2["final_space"]]
+                screen_x = self.board_x + int(dest_space["board_x"] * scale_x)
+                screen_y = int(dest_space["board_y"] * scale_y) + board_y
+                radius = max(8, int(15 * min(scale_x, scale_y)))
+                pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), radius, 3)
+
+        ################## Captain ####################
+        captain_space = self.game_state["captain_space"]
+        space_id = self.game_state["space_lookup"][captain_space]
+        screen_x = self.board_x + int(space_id["board_x"] * scale_x)
+        screen_y = int(space_id["board_y"] * scale_y) + board_y
+        radius = max(8, int(15 * min(scale_x, scale_y)))
+        pygame.draw.circle(self.screen,(255,0,0),(screen_x, screen_y), radius)
 
     ######################################################################
     # DRAWING — IN-GAME PANELS
@@ -1446,7 +1451,7 @@ class game_ui:
 
         
         own_player = self.get_my_player()
-        if player is None:
+        if own_player is None:
             return
         coins = own_player["coins"] 
         coin_label = self.font.render(str(coins),True,(0,0,0)) 
@@ -2884,10 +2889,8 @@ class game_ui:
     def rejoin_game(self, room_id):
         name = self.save_data.settings.get("player_name", "")
         if not self.network:
-            server_ip = self.save_data.settings.get("server_ip", "localhost")
             self.network = network_manager()
-            self.network.connect(f"http://{server_ip}")
-            #self.network.connect(f"http://{server_ip}:5000")
+            self.network.connect(SERVER_URL)
         self.network.sio.emit("rejoin_room", {"room_id": room_id, "name": name})
 
     # ── Connect and confirm ──────────────────────────────────────────────────────
@@ -2932,8 +2935,7 @@ class game_ui:
             if self.game_state["reconnect_attempts"] % 90 == 0:  # try every 3 seconds at 30fps
                 try:
                     my_name = self.game_state["players"][self.my_player_index]["name"]
-                    server_ip = self.save_data.settings.get("server_ip", "localhost")
-                    self.network.reconnect(f"http://{server_ip}:5000", self.room_id, my_name)
+                    self.network.reconnect(SERVER_URL, self.room_id, my_name)
                 except Exception:
                     pass
 
@@ -2985,19 +2987,22 @@ class game_ui:
 
         if self.network.reconnected:
             self.network.reconnected = False
-            self.game_state["menu"]["menu_level"] = "game"
+            if self.network.incoming_state:
+                self.apply_network_state(self.network.incoming_state)
+                self.network.incoming_state = None
             self.build_buttons()
 
         if self.network.join_error:
             self.network.join_error = False
             self.game_state["menu"]["lobby_error"] = getattr(self.network, "join_error_message", "Could not rejoin game")
 
-    def apply_network_state(self, state):
-        
+    def apply_network_state(self, state):     
         local_menu = self.game_state.get("menu")
 
+        CLIENT_ONLY_KEYS = {"spaces", "space_lookup", "board"}
         for key, value in state.items():
-            self.game_state[key] = value
+            if key not in CLIENT_ONLY_KEYS:
+                self.game_state[key] = value
 
         if local_menu is not None:
             self.game_state["menu"] = local_menu
@@ -3023,14 +3028,15 @@ class game_ui:
                 int(k): int(v) for k, v in state["coin_lookup"].items()
             }
 
-        if "board_seed" in state and self.game_state.get("board") is None:
-            board, all_spaces = self.setup.create_board_from_seed(state["board_seed"])
-
-            self.game_state["board"] = board
-            self.game_state["spaces"] = all_spaces
-            self.game_state["space_lookup"] = {s["id"]: s for s in all_spaces}
-            self.raw_board = board
-            self.rescale_board()
+        if "board_seed" in state:
+            current_seed = self.game_state.get("board_seed")
+            if state["board_seed"] != current_seed or self.game_state.get("board") is None:
+                board, all_spaces = self.setup.create_board_from_seed(state["board_seed"])
+                self.game_state["board"] = board
+                self.game_state["spaces"] = all_spaces
+                self.game_state["space_lookup"] = {s["id"]: s for s in all_spaces}
+                self.raw_board = board
+                self.rescale_board()
 
             # Assign my_player_index by matching name after shuffle
             if self.my_player_index is None:
@@ -3046,11 +3052,5 @@ class game_ui:
                 if player["name"] == my_name:
                     self.my_player_index = i
                     break
-
-        # Transition the menu out of the waiting room once an active game
-        # phase arrives (server sent the initial game state).
-        game_phase = self.game_state.get("phase")
-        if game_phase not in (None, "menu") and self.game_state["menu"].get("menu_level") in ("waiting_room", "game"):
-            self.game_state["menu"]["menu_level"] = "game"
 
         self.build_buttons()
