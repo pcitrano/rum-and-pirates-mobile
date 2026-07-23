@@ -94,6 +94,8 @@ class ServerGameSetup:
         )
         spaces_to_remove = set()
         new_spaces = []
+        # Sort by ID so merge order is identical on server and client.
+        edge_spaces.sort(key=lambda s: s["id"])
         next_space_id = max(space["id"] for space in all_spaces) + 1
 
         for i in range(len(edge_spaces)):
@@ -118,8 +120,7 @@ class ServerGameSetup:
                     for nid in space_b["neighbors"]:
                         if nid != space_a["id"]:
                             neighbor_ids.append(nid)
-                    seen = set()
-                    neighbor_ids = [n for n in neighbor_ids if not (n in seen or seen.add(n))]
+                    neighbor_ids = list(set(neighbor_ids))
 
                     new_space = {
                         "id": next_space_id,
