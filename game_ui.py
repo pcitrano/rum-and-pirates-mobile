@@ -267,9 +267,12 @@ class game_ui:
     def rescale_dice(self, raw_dice_images):
         self.dice_images = {}
         for filename, img in raw_dice_images.items():
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img_rgb = np.transpose(img_rgb, (1, 0, 2))
-            surface = pygame.surfarray.make_surface(img_rgb)
+            img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+            img_rgba = np.transpose(img_rgba, (1, 0, 2))
+            surface = pygame.surfarray.make_surface(img_rgba[:, :, :3])
+            surface = surface.convert_alpha()
+            alpha = img_rgba[:, :, 3]
+            pygame.surfarray.pixels_alpha(surface)[:] = alpha
             self.dice_images[filename] = pygame.transform.smoothscale(
                 surface, (self.card_size, self.card_size)
             )
@@ -3030,13 +3033,17 @@ class game_ui:
             self.game_state["legal_moves"] = normalised
 
         if "occupied_paths" in state:
-            for path in self.game_state.get("occupied_paths", []):
-                if "path" in path:
-                    path["path"] = [int(p) for p in path["path"]]
-                if "start" in path:
-                    path["start"] = int(path["start"])
-                if "destination" in path:
-                    path["destination"] = int(path["destination"])
+            normalised_paths = []
+            for path in state["occupied_paths"]:
+                p = dict(path)
+                if "path" in p:
+                    p["path"] = [int(x) for x in p["path"]]
+                if "start" in p:
+                    p["start"] = int(p["start"])
+                if "destination" in p:
+                    p["destination"] = int(p["destination"])
+                normalised_paths.append(p)
+            self.game_state["occupied_paths"] = normalised_paths
 
         if "alley_lookup" in state:
             self.game_state["alley_lookup"] = {

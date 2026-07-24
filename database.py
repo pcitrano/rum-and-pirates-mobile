@@ -71,7 +71,7 @@ class database:
 
         for filename in os.listdir(image_folder):
 
-            if filename.startswith("Die"):
+            if filename.startswith("die"):
                 full_path = os.path.join(image_folder,filename)
                 image = cv2.imread(full_path)
 
@@ -89,7 +89,7 @@ class database:
     def load_die_details(self):
         dice = {}
         for die_number in [1,2,3,4,5,6]:
-            dice[die_number] = {"value": die_number, "image": f"Die {die_number}.png"}
+            dice[die_number] = {"value": die_number, "image": f"die_{die_number}.png"}
         return dice
     
     def load_ui_images(self):
