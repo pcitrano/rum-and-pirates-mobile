@@ -184,6 +184,7 @@ class game_ui:
         self.menu_frame = 0
         self.menu_frame_timer = 0
         self.menu_animation_fps = 60
+        self.watch_image = self.ui_images["Watch.png"]
 
         # Drawing board
         if self.game_state.get("board") is not None:
@@ -384,6 +385,17 @@ class game_ui:
     
                 self.ui_images[filename] = pygame.transform.smoothscale(
                     surface, (self.CHAR_CARD_WIDTH * self.width, self.CHAR_CARD_HEIGHT * self.height)
+                )
+
+            if filename == "Watch.png":
+                img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+                h, w = img_rgba.shape[:2]
+                
+                surface = pygame.image.frombuffer(img_rgba.tobytes(), (w, h), "RGBA")
+                surface = surface.convert_alpha()  # ensures per-pixel alpha is properly set
+                
+                self.ui_images[filename] = pygame.transform.smoothscale(
+                    surface, (int(20), int(30))
                 )
 
             
@@ -871,6 +883,8 @@ class game_ui:
         
         game_stats = self.stats["games"]
         player_stats = self.stats["players"]
+        captain_stats = self.save_data.get_captain_averages(self.stats)
+
         players = [name for name, data in player_stats.items() if data["games_played"] >= 3]
         max_visible = 5  
         scroll = self.game_state["menu"].get("stats_scroll", 0)
@@ -1347,8 +1361,24 @@ class game_ui:
         # Messages 
         message_y = input_rect.y - 32
         for message in reversed(self.chat_messages[-10:]):
-            message_y = self.draw_wrapped_text_up(self.font, f'{message["player"]}: {message["text"]}', x + 8, message_y, width - 16, (255,255,255))
-            message_y -= 4
+
+            message_text = (f'{message["player"]}: ' f'{message["text"]}')
+
+            parts = message_text.split("[watch]")
+
+            current_x = x + 8
+
+            for i, part in enumerate(parts):
+                if part:
+                    rendered_text = self.font.render(part,True,(255, 255, 255))
+                    self.screen.blit(rendered_text,(current_x, message_y))
+                    current_x += rendered_text.get_width()
+
+                if i < len(parts) - 1:
+                    self.screen.blit(self.watch_image,(current_x, message_y))
+                    current_x += self.watch_image.get_width()
+
+            message_y -= 30
     
     def toggle_chat(self):
         self.chat_open = not self.chat_open

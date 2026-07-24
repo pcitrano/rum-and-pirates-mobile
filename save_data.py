@@ -71,6 +71,71 @@ class save_data:
             }
         return self.stats["players"][name]
 
+    def get_captain_averages(self, stats):
+
+        categories = [
+            "pubs", "maps", "guards", "treasure",
+            "scorpions", "supplies", "rendezvous", "wrangle", "total"
+        ]
+
+        totals = {}
+
+        for game in stats.get("games", []):
+            for player in game.get("players", []):
+
+                # Skip players who did not use a character
+                captain = player.get("character")
+
+                if not captain:
+                    continue
+
+                scores = player.get("scores", {})
+                if captain not in totals:
+                    totals[captain] = {
+                        "games": 0,
+                        "wins": 0,
+                        "sums": {cat: 0 for cat in categories}
+                    }
+
+                entry = totals[captain]
+                entry["games"] += 1
+                if player.get("won"):
+                    entry["wins"] += 1
+                for cat in categories:
+                    entry["sums"][cat] += scores.get(cat, 0)
+
+        result = {}
+
+        for captain, entry in totals.items():
+            games = entry["games"]
+            captain_name_parts = captain.split()
+            display_name = (
+                captain_name_parts[1]
+                if len(captain_name_parts) > 1
+                else captain
+            )
+
+            result[display_name] = {
+                "games_played": games,
+                "wins": entry["wins"],
+                "win_rate": round(entry["wins"] / games * 100, 1) if games else 0,
+                "averages": {
+                    cat: round(entry["sums"][cat] / games, 1)
+                    for cat in categories
+                }
+            }
+
+        # Sort by average total points, highest first
+        result = dict(
+            sorted(
+                result.items(),
+                key=lambda item: item[1]["averages"]["total"],
+                reverse=True
+            )
+        )
+
+        return result
+
     def record_game_result(self, players):
         import datetime
         
