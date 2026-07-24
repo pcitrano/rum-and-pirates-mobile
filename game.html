@@ -1872,10 +1872,25 @@ function sendChatMessage() {
 function renderChat() {
   const list = document.getElementById("chat-list");
   const wasNearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
-  list.innerHTML = chatMessages.map(m =>
-    `<p><span class="chat-author">${escapeHtml(m.player || "?")}:</span> ${escapeHtml(m.text || "")}</p>`
-  ).join("");
-  if (wasNearBottom) list.scrollTop = list.scrollHeight;
+  list.innerHTML = chatMessages.map(m => {
+    let text = escapeHtml(m.text || "");
+
+    // Replace [watch] with the HTML watch emoji
+    text = text.replaceAll("[watch]",'<span class="chat-emoji">⌚</span>');
+    return `
+      <p>
+        <span class="chat-author">
+          ${escapeHtml(m.player || "?")}:
+        </span>
+        ${text}
+      </p>
+    `;
+
+  }).join("");
+
+  if (wasNearBottom) {
+    list.scrollTop = list.scrollHeight;
+  }
 }
 
 function escapeHtml(str) {
