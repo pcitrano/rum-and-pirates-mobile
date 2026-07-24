@@ -51,27 +51,6 @@
     color: var(--rope);
     font-style: italic;
   }
-  /* ── Info bar: round + room, its own line above player statuses ── */
-  #info-bar {
-    flex-shrink: 0;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(13,27,42,0.95);
-    border-bottom: 1px solid var(--wood);
-    padding: 3px 12px;
-  }
-  #info-bar .round-info {
-    font-family: 'Pirata One', cursive;
-    font-size: 1rem;
-    color: var(--gold-light);
-  }
-  #info-bar .room-info {
-    font-size: 0.8rem;
-    color: var(--rope);
-    font-style: italic;
-  }
   .topbar-btn {
     background: none;
     border: 1px solid var(--wood-light);
@@ -80,25 +59,7 @@
     font-size: 1.1rem;
     padding: 2px 10px;
     cursor: pointer;
-    position: relative;
   }
-  .topbar-btn .badge {
-    position: absolute;
-    top: -6px; right: -6px;
-    background: var(--red);
-    color: var(--parchment);
-    font-size: 0.6rem;
-    font-family: 'Crimson Text', Georgia, serif;
-    min-width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
-    border: 1px solid var(--navy);
-  }
-  .topbar-btn .badge.show { display: flex; }
 
   /* ── Game area (everything below the topbar) ── */
   #game-area {
@@ -152,15 +113,15 @@
     color: var(--gold-light);
   }
 
-  /* ── Wrangle screen (covers only the board area) ── */
+  /* ── Wrangle screen ── */
   #wrangle-screen {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: #d9bd8c;
     display: none;
     flex-direction: column;
     align-items: center;
-    z-index: 20;
+    z-index: 55;
     overflow-y: auto;
     padding: 20px;
   }
@@ -379,6 +340,12 @@
   .player-pirates { color: var(--rope); font-size: 0.85rem; }
   .player-barrels { color: #b0c4de; font-size: 0.85rem; }
   .player-coins { color: var(--gold-light); font-size: 0.85rem; }
+  .stat-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    object-fit: contain;
+  }
   .active-crown { color: var(--gold-light); font-size: 0.9rem; }
   .player-character {
     margin-left: auto;
@@ -441,7 +408,7 @@
   /* ── Action log ── */
   #log-panel {
     position: fixed;
-    top: 70px; left: 0; right: 0; bottom: 0;
+    top: 44px; left: 0; right: 0; bottom: 0;
     background: rgba(13,27,42,0.97);
     z-index: 15;
     display: none;
@@ -465,57 +432,6 @@
   #log-close {
     margin-top: 10px;
     padding: 10px;
-    background: var(--wood);
-    border: none;
-    border-radius: 4px;
-    color: var(--parchment);
-    font-family: 'Pirata One', cursive;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-
-  /* ── Chat ── */
-  #chat-panel {
-    position: fixed;
-    top: 70px; left: 0; right: 0; bottom: 0;
-    background: rgba(13,27,42,0.97);
-    z-index: 15;
-    display: none;
-    flex-direction: column;
-    padding: 12px;
-  }
-  #chat-panel.open { display: flex; }
-  #chat-panel h3 {
-    font-family: 'Pirata One', cursive;
-    color: var(--gold-light);
-    margin-bottom: 8px;
-  }
-  #chat-list {
-    flex: 1;
-    overflow-y: auto;
-    font-size: 0.9rem;
-    color: var(--parchment);
-    line-height: 1.6;
-  }
-  #chat-list p { border-bottom: 1px solid rgba(160,120,64,0.2); padding: 4px 0; }
-  #chat-list p .chat-author { color: var(--gold-light); font-weight: 600; }
-  #chat-input-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-  }
-  #chat-input {
-    flex: 1;
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid var(--wood-light);
-    background: rgba(242,223,167,0.08);
-    color: var(--parchment);
-    font-family: 'Crimson Text', Georgia, serif;
-    font-size: 1rem;
-  }
-  #chat-send {
-    padding: 10px 16px;
     background: var(--wood);
     border: none;
     border-radius: 4px;
@@ -578,23 +494,15 @@
 <div id="app">
   <!-- Top bar -->
   <div id="topbar">
-    <div style="display:flex; gap:8px;">
-      <button class="topbar-btn" onclick="toggleChat()">
-        💬 Chat
-        <span class="badge" id="chat-badge"></span>
-      </button>
+    <div>
+      <div class="round-info" id="round-display">Round —</div>
+      <div class="room-info" id="room-display">Room: —</div>
     </div>
     <div style="display:flex; gap:8px;">
       <button class="topbar-btn" onclick="toggleLog()">📜 Log</button>
       <button class="topbar-btn" onclick="toggleInventory()">🎒 Inventory</button>
       <button class="topbar-btn" onclick="toggleActionPanel()">☰ Actions</button>
     </div>
-  </div>
-
-  <!-- Round / room info, its own line -->
-  <div id="info-bar">
-    <div class="round-info" id="round-display">Round —</div>
-    <div class="room-info" id="room-display">Room: —</div>
   </div>
 
   <!-- Everything below the topbar: status, tableau, then board -->
@@ -613,8 +521,6 @@
         <img id="contest-die-image" style="width:60px; display:none; margin:6px auto 4px; border-radius:5px;">
         <div class="contest-progress" id="contest-progress-label"></div>
       </div>
-      <!-- Wrangle screen: covers only the board, leaves status bar and tableau visible -->
-      <div id="wrangle-screen"></div>
     </div>
   </div>
 </div>
@@ -633,15 +539,8 @@
   <button id="log-close" onclick="toggleLog()">Close</button>
 </div>
 
-<!-- Chat panel -->
-<div id="chat-panel">
-  <h3>💬 Chat</h3>
-  <div id="chat-list"></div>
-  <div id="chat-input-row">
-    <input type="text" id="chat-input" placeholder="Say something..." maxlength="200" onkeydown="if(event.key==='Enter'){sendChatMessage();}">
-    <button id="chat-send" onclick="sendChatMessage()">Send</button>
-  </div>
-</div>
+<!-- Wrangle screen -->
+<div id="wrangle-screen"></div>
 
 <!-- Inventory overlay -->
 <div id="inventory-overlay">
@@ -665,8 +564,6 @@ let needsBoardSizing = false;
 let myName = "";
 let myRoomId = null;
 let myPlayerIndex = null;
-let chatMessages = [];
-let unreadChatCount = 0;
 let tileData = [];       // raw JSON for all 9 tiles
 let tileImages = [];     // loaded Image objects
 let boardSpaces = [];    // computed spaces with board_x, board_y
@@ -1391,7 +1288,7 @@ function updateUI() {
     renderGameOver();
     return;
   } else if (wrangleActive) {
-    document.getElementById("game-area").style.display = "flex";
+    document.getElementById("game-area").style.display = "none";
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
     const goOverlay = document.getElementById("game-over-overlay");
@@ -1429,7 +1326,7 @@ function updateUI() {
     const colorCss = Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : (c || '#fff');
     const myCoins = (i === myPlayerIndex && player.coins !== undefined) ? player.coins : null;
     const coinsHtml = myCoins !== null
-      ? `<span class="player-coins">🪙 ${player.coins || 0}</span>`
+      ? `<span class="player-coins"><img class="stat-icon" src="${SERVER}/assets/Doubloon.png" onerror="this.remove()"> ${player.coins || 0}</span>`
       : '';
     const myScore = (i === myPlayerIndex && player.score) ? player.score.total : null;
     const scoreHtml = myScore !== null
@@ -1444,7 +1341,7 @@ function updateUI() {
       <span class="player-name" style="color:${colorCss}">${player.name}</span>
       ${boardedFlagHtml}
       <span class="player-pirates">☠️ ${player.pirates || 0}/${total}</span>
-      <span class="player-barrels">🛢 ${player.barrels || 0}</span>
+      <span class="player-barrels"><img class="stat-icon" src="${SERVER}/assets/Rum%20Barrel.png" onerror="this.remove()"> ${player.barrels || 0}</span>
       ${coinsHtml}
       ${scoreHtml}
       ${characterTitle ? `<span class="player-character">${characterTitle}</span>` : ""}
@@ -1830,54 +1727,6 @@ function toggleLog() {
   document.getElementById("log-panel").classList.toggle("open");
 }
 
-// ── Chat ──────────────────────────────────────────────────────────────────────
-function toggleChat() {
-  const panel = document.getElementById("chat-panel");
-  panel.classList.toggle("open");
-  if (panel.classList.contains("open")) {
-    unreadChatCount = 0;
-    updateChatBadge();
-    renderChat();
-    const input = document.getElementById("chat-input");
-    input.focus();
-    const list = document.getElementById("chat-list");
-    list.scrollTop = list.scrollHeight;
-  }
-}
-
-function updateChatBadge() {
-  const badge = document.getElementById("chat-badge");
-  if (unreadChatCount > 0) {
-    badge.textContent = unreadChatCount > 9 ? "9+" : String(unreadChatCount);
-    badge.classList.add("show");
-  } else {
-    badge.classList.remove("show");
-  }
-}
-
-function sendChatMessage() {
-  const input = document.getElementById("chat-input");
-  const text = input.value.trim();
-  if (!text || !socket || !myRoomId) return;
-  socket.emit("chat", { room_id: myRoomId, text: text });
-  input.value = "";
-}
-
-function renderChat() {
-  const list = document.getElementById("chat-list");
-  const wasNearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
-  list.innerHTML = chatMessages.map(m =>
-    `<p><span class="chat-author">${escapeHtml(m.player || "?")}:</span> ${escapeHtml(m.text || "")}</p>`
-  ).join("");
-  if (wasNearBottom) list.scrollTop = list.scrollHeight;
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 // ── Inventory ─────────────────────────────────────────────────────────────────
 const CARD_FOLDERS_INV = {
   pubs: "pubs",
@@ -2025,19 +1874,6 @@ function connectToGame(name, roomId, playerIndex) {
 
   socket.on("error", (data) => {
     showToast(data.message || "Something went wrong.");
-  });
-
-  socket.on("chat", (data) => {
-    chatMessages.push(data);
-    const panel = document.getElementById("chat-panel");
-    if (panel.classList.contains("open")) {
-      renderChat();
-      const list = document.getElementById("chat-list");
-      list.scrollTop = list.scrollHeight;
-    } else {
-      unreadChatCount++;
-      updateChatBadge();
-    }
   });
 
   socket.on("state_updated", (data) => {
