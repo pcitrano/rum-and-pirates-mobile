@@ -585,6 +585,7 @@
   <!-- Top bar -->
   <div id="topbar">
     <div style="display:flex; gap:8px;">
+      <button class="topbar-btn" onclick="requestResync()" title="Resync game state">🔄</button>
       <button class="topbar-btn" onclick="toggleChat()">
         💬 Chat
         <span class="badge" id="chat-badge"></span>
@@ -1869,28 +1870,22 @@ function sendChatMessage() {
   input.value = "";
 }
 
+function requestResync() {
+  // Manual recovery: ask the server to re-broadcast the current game
+  // state to everyone in the room. Use this if the UI looks stuck
+  // (e.g. waiting on a turn that should have passed) with no error shown.
+  if (!socket || !myRoomId) return;
+  socket.emit("request_resync", { room_id: myRoomId });
+  showToast("Requesting latest game state...");
+}
+
 function renderChat() {
   const list = document.getElementById("chat-list");
   const wasNearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
-  list.innerHTML = chatMessages.map(m => {
-    let text = escapeHtml(m.text || "");
-
-    // Replace [watch] with the HTML watch emoji
-    text = text.replaceAll("[watch]",'<span class="chat-emoji">⌚</span>');
-    return `
-      <p>
-        <span class="chat-author">
-          ${escapeHtml(m.player || "?")}:
-        </span>
-        ${text}
-      </p>
-    `;
-
-  }).join("");
-
-  if (wasNearBottom) {
-    list.scrollTop = list.scrollHeight;
-  }
+  list.innerHTML = chatMessages.map(m =>
+    `<p><span class="chat-author">${escapeHtml(m.player || "?")}:</span> ${escapeHtml(m.text || "")}</p>`
+  ).join("");
+  if (wasNearBottom) list.scrollTop = list.scrollHeight;
 }
 
 function escapeHtml(str) {

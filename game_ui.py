@@ -472,7 +472,16 @@ class game_ui:
             if message:
                 self.network.send_chat(message)
                 self.chat_input_text = ""
-        
+
+        # Manual resync: press F5 any time (not while typing) to ask the
+        # server to re-broadcast the current game state to everyone.
+        # Useful if the UI looks stuck but no error was shown.
+        if event.key == pygame.K_F5 and self.game_state["selected_field"] is None:
+            if self.network is not None and self.network.connected:
+                self.network.request_resync()
+                self.log_action("Requested a state resync from the server.")
+            return
+
         if event.key == pygame.K_BACKSPACE:
             if field == "room_code":
                 self.game_state["menu"]["room_code_input"] = self.game_state["menu"]["room_code_input"][:-1]

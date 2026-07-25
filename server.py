@@ -4,8 +4,44 @@ import uuid
 import json, os
 import time
 import threading
+import logging
+import traceback
+from logging.handlers import RotatingFileHandler
 from server_game_setup import ServerGameSetup
 from server_gameplay import ServerGameplay
+
+# ── Error logging ────────────────────────────────────────────────────────────
+# Logs to console (visible in Railway/hosting logs) and to a rotating file
+# so past errors survive process restarts and can be reviewed after the fact.
+logger = logging.getLogger("rum_and_pirates")
+logger.setLevel(logging.INFO)
+
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s"
+))
+logger.addHandler(_console_handler)
+
+try:
+    os.makedirs("logs", exist_ok=True)
+    _file_handler = RotatingFileHandler(
+        "logs/server.log", maxBytes=2_000_000, backupCount=3
+    )
+    _file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s"
+    ))
+    logger.addHandler(_file_handler)
+except Exception as e:
+    logger.warning(f"Could not set up file logging: {e}")
+
+
+def log_action_error(context, room_id, data, exc):
+    """Log a full traceback plus the action payload that triggered it,
+    so we can reproduce and fix action-handling bugs after the fact."""
+    logger.error(
+        f"[{context}] room={room_id} payload={data}\n"
+        f"{traceback.format_exc()}"
+    )
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
@@ -141,114 +177,130 @@ def on_player_action(data):
 
     game_state = rooms[room_id]["game_state"]
 
-    # Normalise integer IDs that JSON may have coerced to strings
-    if "captain_space" in game_state:
-        game_state["captain_space"] = int(game_state["captain_space"])
-    if "active_player" in game_state:
-        game_state["active_player"] = int(game_state["active_player"])
+    try:
+        # Normalise integer IDs that JSON may have coerced to strings
+        if "captain_space" in game_state:
+            game_state["captain_space"] = int(game_state["captain_space"])
+        if "active_player" in game_state:
+            game_state["active_player"] = int(game_state["active_player"])
 
-    if action_type == "move":
-        destination_id = data.get("destination_id")
-        result = gameplay.move_captain(game_state, destination_id)
+        if action_type == "move":
+            destination_id = data.get("destination_id")
+            result = gameplay.move_captain(game_state, destination_id)
 
-        if result is False:
-            emit("error", {"message": "Illegal move"})
-            return
-
-        # Auto-confirm only for a normal captain-space move — the web
-        # client already shows a confirm dialog before sending it. Dark
-        # alley entries land in dark_alley_ask/dark_alley_start instead
-        # and need further player input before anything is committed.
-        if game_state["phase"] == "confirm_move":
-            gameplay.confirm_move(game_state)
-
-    elif action_type == "rest":
-        gameplay.rest(game_state)
-
-    elif action_type == "go_on_board":
-        gameplay.go_on_board(game_state)
-
-    elif action_type == "move_again":
-        gameplay.move_again(game_state)
-
-    elif action_type == "avast":
-        gameplay.avast_turn(game_state)
-
-    elif action_type == "roll":
-        roller_index = data.get("player_index")
-        if game_state.get("next_roller") != roller_index:
-            emit("error", {"message": "It's not your turn to roll"})
-            return
-        gameplay.roll(game_state, roller_index)
-
-    elif action_type == "confirm_roll":
-        gameplay.resolve_roll(game_state)
-
-    elif action_type == "reroll":
-        gameplay.resolve_reroll(game_state)
-
-    elif action_type == "confirm_rendezvous":
-        gameplay.confirm_rendezvous(game_state)
-
-    elif action_type == "supply_choice":
-        gameplay.resolve_supply_choice(game_state, data.get("keep_card", False))
-
-    elif action_type == "har_supply_choice":
-        gameplay.resolve_har_supply(game_state, data.get("chosen_index"))
-
-    elif action_type == "answer_pub_invite":
-        gameplay.answer_pub_invite(game_state, data.get("joined", False))
-
-    elif action_type == "pay_dark_alley":
-        gameplay.pay_dark_alley(game_state, data.get("accepted", False))
-
-    elif action_type == "cancel_dark_alley":
-        gameplay.cancel_dark_alley(game_state)
-
-    elif action_type == "resolve_dark_alley":
-        exit_id = data.get("exit_id")
-        result = gameplay.resolve_dark_alley(game_state, exit_id)
-        if result is False:
-            emit("error", {"message": "Can't exit through that alley"})
-            return
-
-    elif action_type == "choose_guard":
-        gameplay.choose_guard(game_state, data.get("guard_size"))
-
-    elif action_type == "fight_guard":
-        gameplay.resolve_guard(game_state)
-
-    elif action_type == "select_reclaim":
-        space_id = data.get("space_id")
-        if game_state["phase"] == "reclaim_1":
-            success = gameplay.try_reclaim_1(game_state, space_id)
-            if not success:
-                emit("error", {"message": "That space isn't one of your occupied paths."})
-                return
-        elif game_state["phase"] == "reclaim_2":
-            success = gameplay.try_reclaim_2(game_state, space_id)
-            if not success:
-                emit("error", {"message": "Invalid selection - choose again."}, room=room_id)
-                rooms[room_id]["game_state"] = game_state
-                socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+            if result is False:
+                emit("error", {"message": "Illegal move"})
                 return
 
-    else:
-        # Not yet migrated — relay to other clients (e.g. desktop host)
-        emit("action_received", data, room=room_id, include_self=False)
-        return
+            # Auto-confirm only for a normal captain-space move — the web
+            # client already shows a confirm dialog before sending it. Dark
+            # alley entries land in dark_alley_ask/dark_alley_start instead
+            # and need further player input before anything is committed.
+            if game_state["phase"] == "confirm_move":
+                gameplay.confirm_move(game_state)
 
-    # Record stats the moment a server-hosted game finishes, exactly once.
-    if game_state.get("phase") == "game_over" and not game_state.get("stats_recorded"):
+        elif action_type == "rest":
+            gameplay.rest(game_state)
+
+        elif action_type == "go_on_board":
+            gameplay.go_on_board(game_state)
+
+        elif action_type == "move_again":
+            gameplay.move_again(game_state)
+
+        elif action_type == "avast":
+            gameplay.avast_turn(game_state)
+
+        elif action_type == "roll":
+            roller_index = data.get("player_index")
+            if game_state.get("next_roller") != roller_index:
+                emit("error", {"message": "It's not your turn to roll"})
+                return
+            gameplay.roll(game_state, roller_index)
+
+        elif action_type == "confirm_roll":
+            gameplay.resolve_roll(game_state)
+
+        elif action_type == "reroll":
+            gameplay.resolve_reroll(game_state)
+
+        elif action_type == "confirm_rendezvous":
+            gameplay.confirm_rendezvous(game_state)
+
+        elif action_type == "supply_choice":
+            gameplay.resolve_supply_choice(game_state, data.get("keep_card", False))
+
+        elif action_type == "har_supply_choice":
+            gameplay.resolve_har_supply(game_state, data.get("chosen_index"))
+
+        elif action_type == "answer_pub_invite":
+            gameplay.answer_pub_invite(game_state, data.get("joined", False))
+
+        elif action_type == "pay_dark_alley":
+            gameplay.pay_dark_alley(game_state, data.get("accepted", False))
+
+        elif action_type == "cancel_dark_alley":
+            gameplay.cancel_dark_alley(game_state)
+
+        elif action_type == "resolve_dark_alley":
+            exit_id = data.get("exit_id")
+            result = gameplay.resolve_dark_alley(game_state, exit_id)
+            if result is False:
+                emit("error", {"message": "Can't exit through that alley"})
+                return
+
+        elif action_type == "choose_guard":
+            gameplay.choose_guard(game_state, data.get("guard_size"))
+
+        elif action_type == "fight_guard":
+            gameplay.resolve_guard(game_state)
+
+        elif action_type == "select_reclaim":
+            space_id = data.get("space_id")
+            if game_state["phase"] == "reclaim_1":
+                success = gameplay.try_reclaim_1(game_state, space_id)
+                if not success:
+                    emit("error", {"message": "That space isn't one of your occupied paths."})
+                    return
+            elif game_state["phase"] == "reclaim_2":
+                success = gameplay.try_reclaim_2(game_state, space_id)
+                if not success:
+                    emit("error", {"message": "Invalid selection - choose again."}, room=room_id)
+                    rooms[room_id]["game_state"] = game_state
+                    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+                    return
+
+        else:
+            # Not yet migrated — relay to other clients (e.g. desktop host)
+            emit("action_received", data, room=room_id, include_self=False)
+            return
+
+        # Record stats the moment a server-hosted game finishes, exactly once.
+        if game_state.get("phase") == "game_over" and not game_state.get("stats_recorded"):
+            try:
+                game_result = build_game_result_from_state(game_state)
+                record_game_result(game_result)
+                game_state["stats_recorded"] = True
+            except Exception as e:
+                logger.error(f"[stats] failed to record game result: {e}")
+
+        rooms[room_id]["game_state"] = game_state
+        socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+
+    except Exception as exc:
+        # An unhandled error in game logic would previously hang the game
+        # silently — no state_updated ever sent, client just waits forever.
+        # Now we log the full traceback and tell the room something broke,
+        # and re-send the last known-good state so clients can recover.
+        log_action_error("player_action", room_id, data, exc)
+        emit("error", {
+            "message": "Something went wrong processing that action. "
+                       "The game state may need a manual resync."
+        }, room=room_id)
         try:
-            game_result = build_game_result_from_state(game_state)
-            record_game_result(game_result)
-            game_state["stats_recorded"] = True
-        except Exception as e:
-            print(f"[stats] failed to record game result: {e}")
-
-    rooms[room_id]["game_state"] = game_state
-    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+            socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+        except Exception:
+            pass
 
 @socketio.on("start_game")
 def on_start_game(data):
@@ -273,19 +325,26 @@ def on_new_game(data):
         emit("error", {"message": "Room not found"})
         return
 
-    play_with_characters = data.get("play_with_characters", False)
-    random_start = data.get("random_start", False)
+    try:
+        play_with_characters = data.get("play_with_characters", False)
+        random_start = data.get("random_start", False)
 
-    player_names = [p["name"] for p in rooms[room_id]["players"]]
+        player_names = [p["name"] for p in rooms[room_id]["players"]]
 
-    game_state = board_setup.new_game_state(
-        player_names,
-        play_with_characters=play_with_characters,
-        random_start=random_start
-    )
+        game_state = board_setup.new_game_state(
+            player_names,
+            play_with_characters=play_with_characters,
+            random_start=random_start
+        )
 
-    rooms[room_id]["game_state"] = game_state
-    socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+        rooms[room_id]["game_state"] = game_state
+        socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+
+    except Exception as exc:
+        log_action_error("new_game", room_id, data, exc)
+        emit("error", {
+            "message": "Something went wrong starting the game. Try again."
+        }, room=room_id)
 
 @socketio.on("confirm_character")
 def on_confirm_character(data):
@@ -304,13 +363,53 @@ def on_confirm_character(data):
         return
 
     game_state = rooms[room_id]["game_state"]
-    game_state["character_selections"][player_index] = selected_name
-    game_state["character_confirmed"][player_index] = True
 
-    if all(game_state["character_confirmed"]):
-        game_state = board_setup.finish_character_select(game_state, random_start=random_start)
+    try:
+        game_state["character_selections"][player_index] = selected_name
+        game_state["character_confirmed"][player_index] = True
 
-    rooms[room_id]["game_state"] = game_state
+        if all(game_state["character_confirmed"]):
+            game_state = board_setup.finish_character_select(game_state, random_start=random_start)
+
+        rooms[room_id]["game_state"] = game_state
+        socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+
+    except Exception as exc:
+        log_action_error("confirm_character", room_id, data, exc)
+        emit("error", {
+            "message": "Something went wrong confirming your character. "
+                       "The game state may need a manual resync."
+        }, room=room_id)
+        try:
+            socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
+        except Exception:
+            pass
+
+@socketio.on("request_resync")
+def on_request_resync(data):
+    """
+    Manual recovery hatch: any client can ask the server to re-broadcast
+    the room's current game_state to everyone. Use this when a client's
+    UI appears stuck (e.g. waiting on a turn that already passed) even
+    though no error was reported — it forces every client back in sync
+    with the server's authoritative state without needing anyone to
+    leave and rejoin the room.
+    """
+    room_id = data.get("room_id")
+    if not room_id or room_id not in rooms:
+        emit("error", {"message": "Room not found"})
+        return
+
+    game_state = rooms[room_id].get("game_state")
+    if game_state is None:
+        emit("error", {"message": "No active game in this room to resync"})
+        return
+
+    requester = next(
+        (p["name"] for p in rooms[room_id]["players"] if p.get("sid") == request.sid),
+        "?"
+    )
+    logger.info(f"[resync] room={room_id} requested by {requester}")
     socketio.emit("state_updated", {"game_state": game_state}, room=room_id)
 
 @socketio.on("disconnect")
@@ -358,16 +457,15 @@ def on_rejoin_room(data):
     socketio.emit("player_reconnected", {"name": name}, room=room_id)
 
 @socketio.on("chat")
-def handle_chat(data):
-
-    room = rooms[data["room_id"]]
-    player = next((p for p in room["players"] if p["sid"] == request.sid), None)
-
-    if player is None:
-        print(f"[server] chat from unknown player {request.sid}", flush=True)
+def on_chat(data):
+    room_id = data.get("room_id")
+    text = data.get("text", "").strip()
+    if not room_id or not text or room_id not in rooms:
         return
-
-    emit("chat", {"player": player["name"], "text": data["text"]}, room=data["room_id"])
+    room = rooms[room_id]
+    # Identify sender by SID
+    sender = next((p["name"] for p in room["players"] if p.get("sid") == request.sid), "?")
+    socketio.emit("chat", {"player": sender, "text": text}, room=room_id)
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 

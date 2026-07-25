@@ -62,7 +62,6 @@ class network_manager:
         @self.sio.on("rejoined")
         def on_rejoined(data):
             self.room_id = data["room_id"]
-            self.player_index = data.get("player_index")
             self.reconnected = True
         
         @self.sio.on("rejoin_error")
@@ -94,6 +93,23 @@ class network_manager:
     def start_game(self, game_state):
         self.sio.emit("start_game", {"room_id": self.room_id, "game_state": game_state})
 
+    def new_game(self, play_with_characters=False, random_start=False):
+        """Ask the server to generate a fresh game state for the current room."""
+        self.sio.emit("new_game", {
+            "room_id": self.room_id,
+            "play_with_characters": play_with_characters,
+            "random_start": random_start,
+        })
+
+    def confirm_character(self, player_index, selected_name, random_start=False):
+        """Submit a character selection to the server."""
+        self.sio.emit("confirm_character", {
+            "room_id": self.room_id,
+            "player_index": player_index,
+            "selected_name": selected_name,
+            "random_start": random_start,
+        })
+
     def reconnect(self, server_url, room_id, player_name):
         try:
             self.sio.connect(server_url)
@@ -103,3 +119,12 @@ class network_manager:
 
     def send_chat(self, message):
         self.sio.emit("chat", {"room_id": self.room_id, "text": message})
+
+    def request_resync(self):
+        """
+        Manual recovery: ask the server to re-broadcast the room's current
+        game_state to everyone. Use when the UI appears stuck (e.g. waiting
+        on a turn that should have already passed) even without an error.
+        """
+        if self.room_id:
+            self.sio.emit("request_resync", {"room_id": self.room_id})
