@@ -357,6 +357,7 @@ def on_confirm_character(data):
     player_index = data["player_index"]
     selected_name = data["selected_name"]
     random_start = data.get("random_start", False)
+    kracken_events = data.get("kracken_vents",False)
 
     if room_id not in rooms or rooms[room_id]["game_state"] is None:
         emit("error", {"message": "Room not found or game not started"})
@@ -369,7 +370,7 @@ def on_confirm_character(data):
         game_state["character_confirmed"][player_index] = True
 
         if all(game_state["character_confirmed"]):
-            game_state = board_setup.finish_character_select(game_state, random_start=random_start)
+            game_state = board_setup.finish_character_select(game_state, random_start=random_start, kracken_events=kracken_events)
 
         rooms[room_id]["game_state"] = game_state
         socketio.emit("state_updated", {"game_state": game_state}, room=room_id)

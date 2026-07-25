@@ -377,9 +377,24 @@ class ServerGameSetup:
         tableau["wrangle_bedroll"] = decks["wrangle_bedroll"].pop()
         return tableau
 
+    def crete_kracken_cards(self):
+        kracken = [
+            {"event": "Whirlpool", "img": "Whirlpool.jpg"},
+            {"event": "Squall", "img": "Squall.jpg"},
+            {"event": "Typhoon", "img": "Typhoon.jpg"},
+            {"event": "Plague", "img": "Plague.jpg"},
+            {"event": "Rise of Piracy", "img": "Piracy.jpg"},
+            {"event": "Plunder", "img": "Plunder.jpg"},
+            {"event": "Theivers Revenge", "img": "Revenge.jpg"},
+            {"event": "Lost at Sea", "img": "Lost.jpg"},
+        ]
+
+        random.shuffle(kracken)
+        return kracken
+
     # ── Full game state ───────────────────────────────────────────────────
 
-    def new_game_state(self, player_names, play_with_characters=False, random_start=False):
+    def new_game_state(self, player_names, play_with_characters=False, random_start=False, kracken_events=False):
         """
         Builds a complete, ready-to-play game_state entirely on the server:
         board, players, character hands (if enabled), decks and tableau.
@@ -434,6 +449,7 @@ class ServerGameSetup:
 
             "tableau": tableau,
             "decks": decks,
+            "kracken": [],
         }
 
         if play_with_characters:
@@ -444,6 +460,8 @@ class ServerGameSetup:
             game_state = self.generate_board(game_state)
             if random_start:
                 self._apply_random_start(game_state)
+            if kracken_events:
+                game_state["kracken"] = self.crete_kracken_cards()
             game_state["phase"] = "start_turn"
 
         return game_state
@@ -458,7 +476,7 @@ class ServerGameSetup:
         game_state["captain_space"] = new_start
         game_state["legal_moves"] = game_state["captain_graph"][new_start]
 
-    def finish_character_select(self, game_state, random_start=False):
+    def finish_character_select(self, game_state, random_start=False, kracken_events=False):
         hands = game_state.get("character_hands", [])
         selections = game_state.get("character_selections", [])
 
@@ -483,6 +501,8 @@ class ServerGameSetup:
         game_state = self.generate_board(game_state)
         if random_start:
             self._apply_random_start(game_state)
+        if kracken_events:
+            game_state["kracken"] = self.crete_kracken_cards()
 
         game_state["phase"] = "start_turn"
         return game_state
