@@ -16,7 +16,6 @@ class ServerGameSetup:
         self.cards = self.load_cards()
 
     # ── Loading ────────────────────────────────────────────────────────────
-
     def load_all_tiles(self):
         tiles = {}
         for tile_number in range(1, 10):
@@ -31,7 +30,6 @@ class ServerGameSetup:
             return json.load(f)
 
     # ── Board creation ─────────────────────────────────────────────────────
-
     def generate_random_board_seed(self):
         tile_nums = list(self.tiles.keys())
         random.shuffle(tile_nums)
@@ -180,7 +178,6 @@ class ServerGameSetup:
         return all_spaces
 
     # ── Movement graph ─────────────────────────────────────────────────────
-
     def search_path(self, start_id, current_id, path, cost, captain_graph, space_lookup):
         current = space_lookup[current_id]
 
@@ -217,7 +214,6 @@ class ServerGameSetup:
         return captain_graph
 
     # ── Full board + graph generation ──────────────────────────────────────
-
     def generate_board(self, game_state):
         seed = self.generate_random_board_seed()
         game_state["board_seed"] = seed
@@ -261,7 +257,6 @@ class ServerGameSetup:
         return game_state
 
     # ── Players ─────────────────────────────────────────────────────────────
-
     def create_players(self, num_of_players, player_names=None):
         if player_names is not None and len(player_names) != num_of_players:
             raise ValueError("Length of player_names must match num_of_players")
@@ -336,7 +331,6 @@ class ServerGameSetup:
         return hands
 
     # ── Decks & tableau ───────────────────────────────────────────────────
-
     def create_card_decks(self):
         cards = self.cards
         decks = {
@@ -396,7 +390,6 @@ class ServerGameSetup:
         return kracken
 
     # ── Full game state ───────────────────────────────────────────────────
-
     def new_game_state(self, player_names, play_with_characters=False, random_start=False, kracken_events=False):
         """
         Builds a complete, ready-to-play game_state entirely on the server:
@@ -455,12 +448,18 @@ class ServerGameSetup:
             "decks": decks,
             "kracken_deck": [],
             "kracken_event": None,
+            # Stored here (not just passed as a function arg) so the setting
+            # survives from game creation through to finish_character_select,
+            # without the client needing to resend it on confirm_character.
+            "kracken_events_enabled": kracken_events,
         }
 
         if play_with_characters:
             game_state["character_hands"] = self.create_character_ids(num_players)
             game_state["phase"] = "character_select"
-            # Board is generated after character selection, on confirm
+            # Board and kracken deck are generated after character selection,
+            # in finish_character_select — it reads kracken_events_enabled
+            # back off game_state, so nothing further is needed here.
         else:
             game_state = self.generate_board(game_state)
             if random_start:
@@ -481,7 +480,7 @@ class ServerGameSetup:
         game_state["captain_space"] = new_start
         game_state["legal_moves"] = game_state["captain_graph"][new_start]
 
-    def finish_character_select(self, game_state, random_start=False, kracken_events=False):
+    def finish_character_select(self, game_state, random_start=False):
         hands = game_state.get("character_hands", [])
         selections = game_state.get("character_selections", [])
 
@@ -506,7 +505,9 @@ class ServerGameSetup:
         game_state = self.generate_board(game_state)
         if random_start:
             self._apply_random_start(game_state)
-        if kracken_events:
+        # Read back the flag stored at game creation — no need for callers
+        # to pass it again here.
+        if game_state.get("kracken_events_enabled", False):
             game_state["kracken_deck"] = self.create_kracken_cards()
 
         game_state["phase"] = "start_turn"

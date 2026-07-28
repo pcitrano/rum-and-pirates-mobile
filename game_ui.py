@@ -44,7 +44,7 @@ class Button:
             x = self.rect.centerx - rendered.get_width() // 2
             screen.blit(rendered, (x, y))
             y += font.get_linesize()
-
+    
     def draw_transparent(self, screen, font):
 
         button_surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
@@ -157,6 +157,11 @@ class game_ui:
         
         self.splash_start_time = pygame.time.get_ticks()
         self.show_splash = True
+
+        self.kracken_ui_state = None       # None | "splash" | "card"
+        self.kracken_ui_timer = 0
+        self.kracken_seen_round = None     # round number we've already started timing for
+
         self.save_data = save_data
         self.game_state = game_state 
         self.rules = rules
@@ -184,7 +189,6 @@ class game_ui:
         self.menu_frame = 0
         self.menu_frame_timer = 0
         self.menu_animation_fps = 60
-        self.watch_image = self.ui_images["Watch.png"]
 
         # Drawing board
         if self.game_state.get("board") is not None:
@@ -211,9 +215,6 @@ class game_ui:
         self.chat_read_messages = None
         self.chat_notification = False
 
-        if self.rules is not None:
-            self.rules.broadcast = self.broadcast_state
-
     def run(self):
         clock = pygame.time.Clock()
         while self.running:
@@ -229,6 +230,7 @@ class game_ui:
             
             if self.show_splash and pygame.time.get_ticks() - self.splash_start_time > 5000:
                 self.show_splash = False
+
             self.poll_network()
             self.draw()
 
@@ -236,6 +238,8 @@ class game_ui:
                 elapsed = pygame.time.get_ticks() - self.game_state.get("reveal_start_time", 0)
                 if elapsed > 5000:
                     self.finish_character_reveal()
+
+            self.update_kracken_timers()
 
             pygame.display.flip()
 
@@ -268,12 +272,9 @@ class game_ui:
     def rescale_dice(self, raw_dice_images):
         self.dice_images = {}
         for filename, img in raw_dice_images.items():
-            img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
-            img_rgba = np.transpose(img_rgba, (1, 0, 2))
-            surface = pygame.surfarray.make_surface(img_rgba[:, :, :3])
-            surface = surface.convert_alpha()
-            alpha = img_rgba[:, :, 3]
-            pygame.surfarray.pixels_alpha(surface)[:] = alpha
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_rgb = np.transpose(img_rgb, (1, 0, 2))
+            surface = pygame.surfarray.make_surface(img_rgb)
             self.dice_images[filename] = pygame.transform.smoothscale(
                 surface, (self.card_size, self.card_size)
             )
@@ -284,7 +285,7 @@ class game_ui:
             if (filename == "Menu Background.jpg" or filename == "Game Over.jpg"
                 or filename == "Game Screen.jpg" or filename == "Settings.jpg"
                 or filename == "Statistics.png" or filename == "GH Studios.jpg"
-                or filename == "Character Select.png"):
+                or filename == "Character Select.png" or filename == "kracken.jpg"):
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 img_rgb = np.transpose(img_rgb, (1, 0, 2))
                 surface = pygame.surfarray.make_surface(img_rgb)
@@ -387,7 +388,7 @@ class game_ui:
                     surface, (self.CHAR_CARD_WIDTH * self.width, self.CHAR_CARD_HEIGHT * self.height)
                 )
 
-            if filename == "Watch.png":
+            if filename == filename.startswith("cok_"):
                 img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
                 h, w = img_rgba.shape[:2]
                 
@@ -395,9 +396,8 @@ class game_ui:
                 surface = surface.convert_alpha()  # ensures per-pixel alpha is properly set
                 
                 self.ui_images[filename] = pygame.transform.smoothscale(
-                    surface, (int(20), int(30))
+                    surface, (self.width, self.height)
                 )
-
             
             if self.game_state["phase"] == "menu":
                 if filename == "menu_animation":
@@ -463,9 +463,6 @@ class game_ui:
             self.chat_notification = False
             return
 
-        # Manual resync: press F5 any time (not while typing) to ask the
-        # server to re-broadcast the current game state to everyone.
-        # Useful if the UI looks stuck but no error was shown.
         if event.key == pygame.K_F5 and self.game_state["selected_field"] is None:
             if self.network is not None and self.network.connected:
                 self.network.request_resync()
@@ -481,7 +478,7 @@ class game_ui:
             if message:
                 self.network.send_chat(message)
                 self.chat_input_text = ""
-
+        
         if event.key == pygame.K_BACKSPACE:
             if field == "room_code":
                 self.game_state["menu"]["room_code_input"] = self.game_state["menu"]["room_code_input"][:-1]
@@ -490,7 +487,7 @@ class game_ui:
             else:
                 self.game_state["menu"]["player_names"][field] = self.game_state["menu"]["player_names"][field][:-1]
         
-        elif len(event.unicode) == 1 and event.unicode.isprintable():
+        elif len(event.unicode) == 1:
             if field == "room_code":
                 self.game_state["menu"]["room_code_input"] += event.unicode.upper()
             elif field == "chat":
@@ -540,6 +537,12 @@ class game_ui:
                     self.build_buttons()
                     self.broadcast_state()
                     return
+
+        if self.game_state["phase"] == "start_kracken":
+            starting_player = self.game_state.get("starting_player", 0)
+            if self.kracken_ui_state == "card" and self.my_player_index == starting_player:
+                self.finish_kracken_event()
+            return
 
         # Otherwise check spaces
         if not self.chat_open:
@@ -652,7 +655,7 @@ class game_ui:
         else:
             self.screen.blit(menu_image, (0, 0))
 
-        version_text = "Ver 2.20"
+        version_text = "Ver 2.30"
         version_label = self.font.render(version_text, True, (255, 255, 255))
         self.screen.blit(version_label, (1450/1600*self.width, 850/900*self.height))
 
@@ -1218,6 +1221,13 @@ class game_ui:
             self.draw_character_reveal()
             return
 
+        if self.game_state["phase"] == "start_kracken":
+            if self.kracken_ui_state == "card":
+                self.draw_kracken_event()
+            else:
+                self.draw_kracken_splash()
+            return
+
         game_screen = self.ui_images["Game Screen.jpg"]
         self.screen.blit(game_screen,(0,0))
 
@@ -1370,24 +1380,8 @@ class game_ui:
         # Messages 
         message_y = input_rect.y - 32
         for message in reversed(self.chat_messages[-10:]):
-
-            message_text = (f'{message["player"]}: ' f'{message["text"]}')
-
-            parts = message_text.split("[watch]")
-
-            current_x = x + 8
-
-            for i, part in enumerate(parts):
-                if part:
-                    rendered_text = self.font.render(part,True,(255, 255, 255))
-                    self.screen.blit(rendered_text,(current_x, message_y))
-                    current_x += rendered_text.get_width()
-
-                if i < len(parts) - 1:
-                    self.screen.blit(self.watch_image,(current_x, message_y))
-                    current_x += self.watch_image.get_width()
-
-            message_y -= 30
+            message_y = self.draw_wrapped_text_up(self.font, f'{message["player"]}: {message["text"]}', x + 8, message_y, width - 16, (255,255,255))
+            message_y -= 4
     
     def toggle_chat(self):
         self.chat_open = not self.chat_open
@@ -2589,6 +2583,70 @@ class game_ui:
         self.game_state.pop("reveal_start_time", None)
         self.build_buttons()
 
+    # ── Kracken event ─────────────────────────────────────────────────────
+    def update_kracken_timers(self):
+        """
+        Advances the local splash -> card sequence whenever phase is
+        "start_kracken". Runs every frame from the main loop. Timing is
+        kept entirely client-local (not stored in game_state) so it isn't
+        disturbed by incoming state_updated messages, and so each client
+        can display the sequence independently.
+        """
+        if self.game_state.get("phase") != "start_kracken":
+            # Not in a kracken sequence — reset so the next one starts fresh.
+            if self.kracken_ui_state is not None:
+                self.kracken_ui_state = None
+                self.kracken_seen_round = None
+            return
+
+        round_num = self.game_state.get("round")
+        if round_num != self.kracken_seen_round:
+            # A new kracken event just arrived — (re)start the splash.
+            self.kracken_seen_round = round_num
+            self.kracken_ui_state = "splash"
+            self.kracken_ui_timer = pygame.time.get_ticks()
+            return
+
+        elapsed = pygame.time.get_ticks() - self.kracken_ui_timer
+
+        if self.kracken_ui_state == "splash" and elapsed > 5000:
+            self.kracken_ui_state = "card"
+            self.kracken_ui_timer = pygame.time.get_ticks()
+        elif self.kracken_ui_state == "card" and elapsed > 5000:
+            self.finish_kracken_event()
+
+    def draw_kracken_splash(self):
+        splash_img = self.ui_images.get("Kracken Splash.png")
+        if splash_img is not None:
+            self.screen.blit(splash_img, (0, 0))
+
+    def draw_kracken_event(self):
+        event = self.game_state["kracken_event"]
+        event_img = event["img"]
+        event_screen = self.ui_images.get(event_img)
+        if event_screen is not None:
+            self.screen.blit(event_screen, (0, 0))
+
+        # Only the starting player can click through early; everyone else
+        # just waits out the timer. Give a small on-screen hint either way.
+        starting_player = self.game_state.get("starting_player", 0)
+        is_starting_player = self.my_player_index == starting_player
+        hint = "Click to continue" if is_starting_player else "Waiting for starting player..."
+        hint_surface = self.menu_font.render(hint, True, (255, 255, 255))
+        hint_rect = hint_surface.get_rect(center=(self.width / 2, self.height - 40))
+        self.screen.blit(hint_surface, hint_rect)
+
+    def finish_kracken_event(self):
+        """
+        Ends the local splash/card sequence and tells the server to apply
+        the event's effect and advance play. Safe to call multiple times —
+        the server only resolves the event once (kracken_event is popped
+        off kracken_deck already; game_state["kracken_event"] just holds
+        the drawn card until this confirms).
+        """
+        self.kracken_ui_state = None
+        self.send_action({"type": "confirm_kracken"})
+
     def return_menu(self):
 
         #if self.game_state["phase"] == "game_over":
@@ -2633,7 +2691,7 @@ class game_ui:
     ######################################################################
     # SETTINGS
     ######################################################################
-
+ 
     def set_resolution(self, resolution):
         self.save_data.settings["resolution"] = resolution
         self.save_data.save_settings()
@@ -2699,7 +2757,7 @@ class game_ui:
 
     def rest(self):
         self.send_action({"type": "rest"})
-
+    
     def cancel_boarding(self):
         # Boarding confirmation is local UI state only; just rebuild buttons.
         self.game_state["phase"] = "start_turn"
@@ -2818,6 +2876,9 @@ class game_ui:
             self.rules.go_on_board(gs)
         elif t == "move_again":
             self.rules.move_again(gs)
+        elif t == "confirm_kracken":
+            gs["kracken_event"] = None
+            gs["phase"] = "start_turn"
         elif t == "avast":
             self.rules.avast_turn(gs)
         elif t == "roll":
@@ -3059,30 +3120,6 @@ class game_ui:
             self.game_state["captain_graph"] = {
                 int(k): v for k, v in state["captain_graph"].items()
             }
-
-        if "legal_moves" in state:
-            normalised = []
-            for move in state["legal_moves"]:
-                m = dict(move)
-                if "destination" in m:
-                    m["destination"] = int(m["destination"])
-                if "path" in m:
-                    m["path"] = [int(p) for p in m["path"]]
-                normalised.append(m)
-            self.game_state["legal_moves"] = normalised
-
-        if "occupied_paths" in state:
-            normalised_paths = []
-            for path in state["occupied_paths"]:
-                p = dict(path)
-                if "path" in p:
-                    p["path"] = [int(x) for x in p["path"]]
-                if "start" in p:
-                    p["start"] = int(p["start"])
-                if "destination" in p:
-                    p["destination"] = int(p["destination"])
-                normalised_paths.append(p)
-            self.game_state["occupied_paths"] = normalised_paths
 
         if "alley_lookup" in state:
             self.game_state["alley_lookup"] = {

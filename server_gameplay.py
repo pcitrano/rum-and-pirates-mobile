@@ -1,8 +1,12 @@
 import random
+import copy
 
 class ServerGameplay:
-    def __init__(self):
-        pass
+    def __init__(self, board_setup=None):
+        # Reference to the ServerGameSetup instance, needed for board-rebuild
+        # events (Whirlpool, Typhoon) so we reuse create_board_from_seed and
+        # explore_from_captain rather than duplicating board-generation logic.
+        self.board_setup = board_setup
 
     # ── Logging ──────────────────────────────────────────────────────────
     def log_action(self, game_state, text):
@@ -1332,16 +1336,102 @@ class ServerGameplay:
         if game_state["kracken_deck"]:
             game_state["kracken_event"] = game_state["kracken_deck"].pop()
             game_state["phase"] = "start_kracken" 
-            return
+            return game_state
         
         game_state["phase"] = "start_turn"
 
         return game_state
 
+    # ── Kracken board-rebuild helpers ────────────────────────────────────
+    def _captain_tile_seed_index(self, game_state):
+
+        captain_space = game_state["space_lookup"][game_state["captain_space"]]
+        tile_num = captain_space["tile_num"]
+        for i, entry in enumerate(game_state["board_seed"]):
+            if entry["tile_num"] == tile_num:
+                return i
+            
+        return None
+
+    def _rebuild_board_from_seed(self, game_state, new_seed):
+
+        game_state["board_seed"] = new_seed
+        all_spaces = self.board_setup.create_board_from_seed(new_seed)
+        space_lookup = {s["id"]: s for s in all_spaces}
+
+        captain_spaces = [s["id"] for s in all_spaces if s["captain_space"]]
+
+        captain_graph = {}
+        for captain_id in captain_spaces:
+            captain_graph[captain_id] = []
+            self.board_setup.explore_from_captain(captain_id, captain_graph, space_lookup)
+
+        alley_lookup = {}
+        for captain_id, moves in captain_graph.items():
+            for move in moves:
+                for space_id in move["path"]:
+                    space = space_lookup[space_id]
+                    if space["type"] == "dark_alley":
+                        alley_lookup[space_id] = {
+                            "captain": captain_id,
+                            "path": move["path"],
+                            "cost": move["cost"]
+                        }
+
+        coin_lookup = {}
+        for space in all_spaces:
+            if space["type"] == "coin":
+                coin_lookup[space["tile_num"]] = space["id"]
+
+        game_state["spaces"] = all_spaces
+        game_state["space_lookup"] = space_lookup
+        game_state["captain_graph"] = captain_graph
+        game_state["alley_lookup"] = alley_lookup
+        game_state["coin_lookup"] = coin_lookup
+        game_state["occupied_paths"] = []
+
+        captain_id = game_state["captain_space"]
+        if captain_id in space_lookup:
+            space_lookup[captain_id]["captain"] = True
+            game_state["legal_moves"] = self.refresh_legal_moves(game_state)
+        else:
+            self.teleport_captain(game_state)
+
     def kracken_event(self, game_state):
         event = game_state["kracken_event"]["event"]
         tableau = game_state["tableau"] 
         decks = game_state["decks"] 
+
+        if event == "Whirlpool":
+            # Rotate the tile the captain is standing on by 180 degrees.
+            seed_index = self._captain_tile_seed_index(game_state)
+            if seed_index is not None:
+                new_seed = copy.deepcopy(game_state["board_seed"])
+                new_seed[seed_index]["rotation"] = (new_seed[seed_index]["rotation"] + 180) % 360
+                self._rebuild_board_from_seed(game_state, new_seed)
+
+        if event == "Typhoon":
+            seed_index = self._captain_tile_seed_index(game_state)
+            if seed_index is not None:
+                new_seed = copy.deepcopy(game_state["board_seed"])
+                if seed_index == 4:
+                    # Captain on the middle tile: rotate the 8 outer tiles
+                    # clockwise by one grid position, keeping each tile's
+                    # own rotation value unchanged. Ring order (clockwise,
+                    # starting top-left): 0,1,2,5,8,7,6,3.
+                    ring = [0, 1, 2, 5, 8, 7, 6, 3]
+                    old_ring_tiles = [copy.deepcopy(game_state["board_seed"][i]) for i in ring]
+                    for k, pos in enumerate(ring):
+                        new_seed[pos] = old_ring_tiles[(k - 1) % 8]
+                else:
+                    # Captain not on the middle tile: swap its tile with
+                    # the tile diametrically opposite it across the center.
+                    opposite_index = 8 - seed_index
+                    new_seed[seed_index], new_seed[opposite_index] = (
+                        copy.deepcopy(game_state["board_seed"][opposite_index]),
+                        copy.deepcopy(game_state["board_seed"][seed_index]),
+                    )
+                self._rebuild_board_from_seed(game_state, new_seed)
 
         if event == "Squall":
             old_space = game_state["space_lookup"][game_state["captain_space"]]
@@ -1404,7 +1494,5 @@ class ServerGameplay:
             scorpion = tableau["scorpion"] 
             decks["scorpions"].insert(0, scorpion)
         
-                
-
-
-        return
+        game_state["phase"] = "start_turn"      
+        return game_state
