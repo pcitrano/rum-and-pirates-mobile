@@ -388,6 +388,10 @@
       <input type="checkbox" id="lobby-random-start" style="width:18px;height:18px;">
       <span>Random Starting Position</span>
     </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:14px;">
+      <input type="checkbox" id="lobby-kracken" style="width:18px;height:18px;">
+      <span>Call of the Kracken</span>
+    </label>
     <button id="start-sail-btn" class="btn btn-primary" onclick="startGame()" style="margin-top:16px;display:none;">Set Sail! ⚓</button>
     <p id="waiting-for-crew" style="text-align:center;font-style:italic;color:#7a6040;margin-top:16px;">Waiting for more crew to join...</p>
   </div>
@@ -570,11 +574,13 @@ function startGame() {
   if (!isHost || !myRoomId) return;
   const playWithCharacters = document.getElementById("lobby-characters").checked;
   const randomStart = document.getElementById("lobby-random-start").checked;
+  const krackenEvents = document.getElementById("lobby-kracken").checked;
   document.getElementById("lobby-status").textContent = "Setting sail...";
   socket.emit("new_game", {
     room_id: myRoomId,
     play_with_characters: playWithCharacters,
-    random_start: randomStart
+    random_start: randomStart,
+    kracken_events: krackenEvents
   });
 }
 
