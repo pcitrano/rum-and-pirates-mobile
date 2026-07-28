@@ -623,6 +623,12 @@
       </div>
       <!-- Wrangle screen: covers only the board, leaves status bar and tableau visible -->
       <div id="wrangle-screen"></div>
+      <div id="kracken-overlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:black; z-index:200;">
+        <img id="kracken-image"
+          style="max-width:100%;max-height:100%;object-fit:contain;">
+        <div id="kracken-hint" style="position:absolute; bottom:30px; width:100%; text-align:center; color:white; font-family:'Pirata One',cursive; font-size:2rem;">
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -685,6 +691,10 @@ let offsetY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
 let lastTouchDist = 0;
+
+let krackenUiState = null;      // null | "splash" | "card"
+let krackenTimer = 0;
+let krackenSeenRound = null;
 
 // ── Board generation (mirrors GameSetup.py) ───────────────────────────────────
 function rotateNormalized(x, y, rotation) {
@@ -890,9 +900,16 @@ function initBoardSize() {
 }
 
 canvas.addEventListener("pointerdown", e => {
-  isPanning = true;
-  panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
-  canvas.setPointerCapture(e.pointerId);
+  if (gameState?.phase === "start_kracken") {
+        if (myPlayerIndex === gameState.starting_player) {
+            finishKrackenEvent();
+        }
+        return;
+    }
+
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
+    canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener("pointermove", e => {
   if (!isPanning) return;
@@ -1316,6 +1333,65 @@ function renderWrangleScreen() {
   `;
 }
 
+// ── Wrangle screen ────────────────────────────────────────────────────────────
+function updateKrackenTimers() {
+    if (!gameState || gameState.phase !== "start_kracken") {
+        krackenUiState = null;
+        krackenSeenRound = null;
+        document.getElementById("kracken-overlay").style.display = "none";
+        return;
+    }
+
+    if (gameState.round !== krackenSeenRound) {
+        krackenSeenRound = gameState.round;
+        krackenUiState = "splash";
+        krackenTimer = Date.now();
+        showKrackenSplash();
+        return;
+    }
+
+    const elapsed = Date.now() - krackenTimer;
+    if (krackenUiState === "splash" && elapsed > 5000) {
+        krackenUiState = "card";
+        krackenTimer = Date.now();
+        showKrackenCard();
+    }
+    else if (krackenUiState === "card" && elapsed > 5000) {
+        finishKrackenEvent();
+    }
+}
+
+function showKrackenSplash() {
+    const overlay = document.getElementById("kracken-overlay");
+    document.getElementById("kracken-image").src =
+        `${SERVER}/assets/kracken/kracken.jpg`;
+    document.getElementById("kracken-hint").textContent = "";
+    overlay.style.display = "flex";
+}
+
+function showKrackenCard() {
+    const overlay = document.getElementById("kracken-overlay");
+    document.getElementById("kracken-image").src =
+        `${SERVER}/assets/kracken/${gameState.kracken_event.img}`;
+    const startingPlayer = gameState.starting_player || 0;
+    document.getElementById("kracken-hint").textContent =
+        myPlayerIndex === startingPlayer
+            ? "Click to continue"
+            : "Waiting for starting player...";
+    overlay.style.display = "flex";
+}
+
+function finishKrackenEvent() {
+    document.getElementById("kracken-overlay").style.display = "none";
+    krackenUiState = null;
+    socket.emit("game_action", {
+        room_id: myRoomId,
+        action: {
+            type: "confirm_kracken"
+        }
+    });
+}
+
 // ── Game over ─────────────────────────────────────────────────────────────────
 function renderGameOver() {
   let overlay = document.getElementById("game-over-overlay");
@@ -1420,6 +1496,7 @@ function updateUI() {
 
   renderTableau();
   renderContestOverlay();
+  updateKrackenTimers();
 
   if (document.getElementById("inventory-overlay").classList.contains("open")) {
     renderInventory();

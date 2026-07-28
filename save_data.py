@@ -24,6 +24,7 @@ class save_data:
             "wrangle_view": "Classic",
             "random_start": False,
             "play_with_characters": False,
+            "call_of_the_kracken": False,
             "server_ip": "rumandpirates.up.railway.app"
         }
         if os.path.exists(self.settings_path):

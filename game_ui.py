@@ -215,6 +215,9 @@ class game_ui:
         self.chat_read_messages = None
         self.chat_notification = False
 
+        if self.rules is not None:
+            self.rules.broadcast = self.broadcast_state
+
     def run(self):
         clock = pygame.time.Clock()
         while self.running:
@@ -670,30 +673,36 @@ class game_ui:
             count_label = self.menu_font.render(count_text, True, (0, 0, 0))
             self.screen.blit(count_label, (count_label_x, 275/900*self.height))
 
-            # Your name field (host is always player 0)
-            box_width = int(350 / 1600 * self.width)
-            base_x = int(((((490/1600*self.width) - box_width) / 2) + 100/1600*self.width) / 1600 * self.width)
-            x = base_x
-            y = int(420/900 * self.height)
+            # Name Box
+            x = int(155 / 1600 * self.width)
+            y = int(380/900 * self.height)
             name_label = self.font.render("Your Name:",True,(0,0,0))
             self.screen.blit(name_label,(x,y))
             
-            rect = pygame.Rect(x + 150/1600*self.width, y, box_width, int(40/900*self.height))
+            box_width = int(250 / 1600 * self.width)
+            rect = pygame.Rect(320/1600*self.width, y - 5, box_width, int(40/900*self.height))
             self.menu_boxes = [rect]
             color = (200, 180, 80) if self.game_state["selected_field"] == 0 else (80, 80, 80)
             self.menu_button_surface.fill((0, 0, 0, 0))
-            pygame.draw.rect(self.menu_button_surface, color, (0, 0, 225, 40))
-            self.screen.blit(self.menu_button_surface, (x + 150/1600*self.width, y))
+            pygame.draw.rect(self.menu_button_surface, color, (0, 0, 240, 40))
+            self.screen.blit(self.menu_button_surface, (320/1600*self.width, y))
             
             name = menu["player_names"][0] or "Your Name"
             label = self.font.render(name, True, (0, 0, 0))
-            self.screen.blit(label, (rect.x, rect.y + 10))
+            self.screen.blit(label, (rect.x + 5, rect.y + 6))
 
+            # Settings Labels
+            y += 60
             random_label = self.font.render("Random Start:", True, (0, 0, 0))
-            self.screen.blit(random_label, (x, y + 80))
+            self.screen.blit(random_label, (x, y))
 
+            y += 60
             character_label = self.font.render("Use Captains:", True, (0, 0, 0))
-            self.screen.blit(character_label, (x, y + 165))
+            self.screen.blit(character_label, (x, y))
+
+            y += 60
+            kracken_label = self.font.render("Call of the Kracken:", True, (0, 0, 0))
+            self.screen.blit(kracken_label, (x, y))
 
         if menu["menu_level"] == "join_lobby":
             # Room code input field
@@ -2192,6 +2201,8 @@ class game_ui:
         rs_color = (200, 180, 80) if settings.get("random_start") else (80, 80, 80)
         captains_value = "On" if settings.get("play_with_characters") else "Off"
         captains_color = (200, 180, 80) if settings.get("play_with_characters") else (80, 80, 80)
+        kracken_value = "On" if settings.get("call_of_the_kracken") else "Off"
+        kracken_color = (200, 180, 80) if settings.get("call_of_the_kracken") else (80, 80, 80)
 
         if phase == "menu" and menu_level == "main":
             self.buttons = []
@@ -2214,10 +2225,11 @@ class game_ui:
         if phase == "menu" and menu_level == "host_lobby":
             self.buttons = []
             self.transparent_buttons = []
-            self.transparent_buttons.append(Button(int(355/1600*self.width), player_plus_y + 25, menu_option_width / 4, menu_option_height / 1.4, ">", self.increase_players))
-            self.transparent_buttons.append(Button(int(270/1600*self.width), player_plus_y + 25, menu_option_width / 4, menu_option_height / 1.4, "<", self.decrease_players))
-            self.buttons.append(Button(375/1600*self.width, 490/900*self.height , 150/1600*self.width, 50, rs_value, self.toggle_random_start, color=rs_color))
-            self.buttons.append(Button(375/1600*self.width, 575/900*self.height , 150/1600*self.width, 50, captains_value, self.toggle_characters, color=captains_color))
+            self.transparent_buttons.append(Button(int(460/1600*self.width), int(280/900*self.height), int(40/1600*self.width), int(40/900*self.height), ">", self.increase_players))
+            self.transparent_buttons.append(Button(int(190/1600*self.width), int(280/900*self.height), int(40/1600*self.width), int(40/900*self.height), "<", self.decrease_players))
+            self.buttons.append(Button(400/1600*self.width, 430/900*self.height , 150/1600*self.width, 50, rs_value, self.toggle_random_start, color=rs_color))
+            self.buttons.append(Button(400/1600*self.width, 490/900*self.height , 150/1600*self.width, 50, captains_value, self.toggle_characters, color=captains_color))
+            self.buttons.append(Button(400/1600*self.width, 550/900*self.height , 150/1600*self.width, 50, kracken_value, self.toggle_call_of_the_kracken, color=kracken_color))
             self.transparent_buttons.append(Button(menu_option_x, start_game_y, menu_option_width, menu_option_height, "Host Game", self.confirm_host))
             self.transparent_buttons.append(Button(menu_option_x, start_game_y + 75/900*self.height, menu_option_width, menu_option_height, "Cancel", self.return_menu))
         
@@ -2552,6 +2564,7 @@ class game_ui:
             "room_id": self.room_id,
             "play_with_characters": self.save_data.settings.get("play_with_characters", False),
             "random_start": self.save_data.settings.get("random_start", False),
+            "kracken_events": self.save_data.settings.get("call_of_the_kracken", False)
         })
 
     def confirm_character_select(self):
@@ -2616,7 +2629,7 @@ class game_ui:
             self.finish_kracken_event()
 
     def draw_kracken_splash(self):
-        splash_img = self.ui_images.get("Kracken Splash.png")
+        splash_img = self.ui_images.get("kracken.jpg")
         if splash_img is not None:
             self.screen.blit(splash_img, (0, 0))
 
@@ -2719,6 +2732,10 @@ class game_ui:
     def toggle_characters(self):
         self.save_data.settings["play_with_characters"] = not self.save_data.settings.get("play_with_characters", False)
         self.save_data.save_settings()
+
+    def toggle_call_of_the_kracken(self):
+            self.save_data.settings["call_of_the_kracken"] = not self.save_data.settings.get("call_of_the_kracken", False)
+            self.save_data.save_settings()
 
     def toggle_stats_1(self):
         self.game_state["menu"]["menu_level"] = "stats_1" 
