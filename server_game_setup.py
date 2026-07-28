@@ -448,9 +448,6 @@ class ServerGameSetup:
             "decks": decks,
             "kracken_deck": [],
             "kracken_event": None,
-            # Stored here (not just passed as a function arg) so the setting
-            # survives from game creation through to finish_character_select,
-            # without the client needing to resend it on confirm_character.
             "kracken_events_enabled": kracken_events,
         }
 
