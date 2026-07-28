@@ -377,16 +377,19 @@ class ServerGameSetup:
         tableau["wrangle_bedroll"] = decks["wrangle_bedroll"].pop()
         return tableau
 
-    def crete_kracken_cards(self):
+    def create_kracken_cards(self):
         kracken = [
-            {"event": "Whirlpool", "img": "Whirlpool.jpg"},
-            {"event": "Squall", "img": "Squall.jpg"},
-            {"event": "Typhoon", "img": "Typhoon.jpg"},
-            {"event": "Plague", "img": "Plague.jpg"},
-            {"event": "Rise of Piracy", "img": "Piracy.jpg"},
-            {"event": "Plunder", "img": "Plunder.jpg"},
-            {"event": "Theivers Revenge", "img": "Revenge.jpg"},
-            {"event": "Lost at Sea", "img": "Lost.jpg"},
+            {"event": "Whirlpool", "img": "cok_whirlpool.png"},
+            {"event": "Squall", "img": "cok_squall.png"},
+            {"event": "Typhoon", "img": "cok_typhoon.png"},
+            {"event": "Plague", "img": "cok_plague.png"},
+            {"event": "Rise of Piracy", "img": "cok_piracy.png"},
+            {"event": "Plunder", "img": "cok_plunder.png"},
+            {"event": "Thieves' Revenge", "img": "cok_revenge.png"},
+            {"event": "Lost at Sea", "img": "cok_lost.png"},
+            {"event": "Blackout", "img": "cok_blackout.png"},
+            {"event": "Sleepwalker", "img": "cok_sleepwalker.png"},
+            {"event": "Scorpion Smash", "img": "cok_scorpion.png"},
         ]
 
         random.shuffle(kracken)
@@ -426,6 +429,7 @@ class ServerGameSetup:
             "reclaim_2": None,
 
             "players": players,
+            "max_pirates": 15,
             "character_hands": [],
             "character_selections": [None] * num_players,
             "character_confirmed": [False] * num_players,
@@ -449,7 +453,8 @@ class ServerGameSetup:
 
             "tableau": tableau,
             "decks": decks,
-            "kracken": [],
+            "kracken_deck": [],
+            "kracken_event": None,
         }
 
         if play_with_characters:
@@ -461,7 +466,7 @@ class ServerGameSetup:
             if random_start:
                 self._apply_random_start(game_state)
             if kracken_events:
-                game_state["kracken"] = self.crete_kracken_cards()
+                game_state["kracken_deck"] = self.create_kracken_cards()
             game_state["phase"] = "start_turn"
 
         return game_state
@@ -502,7 +507,7 @@ class ServerGameSetup:
         if random_start:
             self._apply_random_start(game_state)
         if kracken_events:
-            game_state["kracken"] = self.crete_kracken_cards()
+            game_state["kracken_deck"] = self.create_kracken_cards()
 
         game_state["phase"] = "start_turn"
         return game_state

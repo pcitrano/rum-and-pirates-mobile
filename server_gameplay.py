@@ -75,7 +75,7 @@ class ServerGameplay:
                     player["character"] is not None and
                     player["character"]["name"] == "Captain Sullivan the Scorpion Tamer"
                 )
-                if is_sullivan and len(game_state["players"] == 2):
+                if is_sullivan and len(game_state["players"]) == 2:
                     total += 1
                     scorpions += 1
                 elif is_sullivan:
@@ -515,6 +515,12 @@ class ServerGameplay:
         game_state["tableau"]["treasure"] = game_state["decks"]["treasure"].pop()
         self.log_action(game_state, f"{player['name']} found buried treasure.")
         self.score_players(game_state)
+
+        if not game_state["tableau"]["scorpion"]:
+            self.log_action(game_state, "The Kracken killed the scorpion!")
+            game_state["tableau"]["scorpion"] = game_state["decks"]["scorpions"].pop()
+            game_state["phase"] = "post_move"
+            return game_state
  
         return self.start_scorpion(game_state)
  
@@ -1111,7 +1117,26 @@ class ServerGameplay:
         ranking = [winner_index] + eliminated_players
         participants = len(ranking)
 
-        if len(game_state["players"]) <= 3:
+        if not card_2 and len(game_state["players"]) <= 3:
+            if participants == 1:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+            else:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the bedroll.")
+        elif not card_2:
+            if participants == 1:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[0]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk and stole the bedroll!")
+            else:
+                game_state["players"][ranking[0]]["wrangles"].append(card_1)
+                game_state["players"][ranking[1]]["wrangles"].append(card_3)
+                self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
+                self.log_action(game_state, f"{game_state['players'][ranking[1]]['name']} secured the bedroll.")
+        elif len(game_state["players"]) <= 3:
             if participants == 1:
                 game_state["players"][ranking[0]]["wrangles"].append(card_1)
                 self.log_action(game_state, f"{game_state['players'][ranking[0]]['name']} secured the top bunk.")
@@ -1289,7 +1314,7 @@ class ServerGameplay:
         game_state["round"] += 1
 
         for player in game_state["players"]:
-            player["pirates"] = 15 - player["pirate_reserve"]
+            player["pirates"] = game_state["max_pirates"] - player["pirate_reserve"]
             player["board_position"] = 0
             player["pirates_on_board"] = 0
             player["wrangle_pirates"] = 0
@@ -1303,6 +1328,83 @@ class ServerGameplay:
 
         game_state["occupied_paths"] = []
         self.refresh_legal_moves(game_state)
+
+        if game_state["kracken_deck"]:
+            game_state["kracken_event"] = game_state["kracken_deck"].pop()
+            game_state["phase"] = "start_kracken" 
+            return
+        
         game_state["phase"] = "start_turn"
 
         return game_state
+
+    def kracken_event(self, game_state):
+        event = game_state["kracken_event"]["event"]
+        tableau = game_state["tableau"] 
+        decks = game_state["decks"] 
+
+        if event == "Squall":
+            old_space = game_state["space_lookup"][game_state["captain_space"]]
+            old_space["captain"] = False
+            new_space_id = self.find_next_coin_space(game_state)
+            new_space = game_state["space_lookup"][new_space_id]
+            game_state["captain_space"] = new_space_id
+            new_space["captain"] = True
+            game_state["legal_moves"] = self.refresh_legal_moves(game_state)
+
+        if event == "Plague": 
+            game_state["max_pirates"] -= 1
+            for player in game_state["players"]: 
+                player["pirates"] -= 1
+
+        if event == "Rise of Piracy":
+            for player in game_state["players"]:
+                if player["pirate_reserve"] == 0:
+                    player["coins"] += 1
+                else:
+                    player["pirates"] += 1 
+                    player["pirate_reserve"] -= 1
+
+        if event == "Plunder": 
+            for player in game_state["players"]:
+                player["coins"] += 1
+
+        if event == "Thieves' Revenge":
+            for player in game_state["players"]:
+                if player["coins"] > 0:
+                    player["coins"] -= 1
+
+        if event == "Lost at Sea":
+            for card in tableau["maps"]:
+                decks["maps"].insert(0, card)
+            random.shuffle(decks["maps"])
+            if len(decks["maps"]) < 4:
+                for _ in range(len(decks["maps"])):
+                    tableau["maps"].append(decks["maps"].pop())
+            else:
+                for _ in range(4):
+                    tableau["maps"].append(decks["maps"].pop())
+
+        if event == "Blackout":
+            for card in tableau["pubs"]:
+                decks["pubs"].insert(0, card)
+            random.shuffle(decks["pubs"])
+            if len(decks["pubs"]) < 4:
+                for _ in range(len(decks["pubs"])):
+                    tableau["pubs"].append(decks["pubs"].pop())
+            else:
+                for _ in range(4):
+                    tableau["pubs"].append(decks["pubs"].pop())
+
+        if event == "Sleepwalker":
+            hammock = tableau["wrangle_hammock"]
+            decks["wrangle_hammock"].insert(0, hammock)
+
+        if event == "Scorpion Smash":
+            scorpion = tableau["scorpion"] 
+            decks["scorpions"].insert(0, scorpion)
+        
+                
+
+
+        return

@@ -1430,7 +1430,7 @@ function updateUI() {
   bar.innerHTML = "";
   (gameState.players || []).forEach((player, i) => {
     const isActive = i === gameState.active_player;
-    const total = 15 - (player.pirate_reserve || 0);
+    const total = gameState.max_pirates - (player.pirate_reserve || 0);
     const div = document.createElement("div");
     div.className = `player-row ${isActive ? "active" : "inactive"}`;
     const c = player.color;
