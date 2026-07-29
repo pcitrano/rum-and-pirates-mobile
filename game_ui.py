@@ -235,14 +235,20 @@ class game_ui:
                 self.show_splash = False
 
             self.poll_network()
-            self.draw()
 
             if self.game_state.get("phase") == "character_reveal":
                 elapsed = pygame.time.get_ticks() - self.game_state.get("reveal_start_time", 0)
                 if elapsed > 5000:
                     self.finish_character_reveal()
 
-            self.update_kracken_timers()
+            try:
+                self.update_kracken_timers()
+            except Exception as exc:
+                print(f"[kracken] update_kracken_timers error: {exc}")
+                self.kracken_ui_state = None
+                self.kracken_seen_round = None
+
+            self.draw()
 
             pygame.display.flip()
 
@@ -391,7 +397,7 @@ class game_ui:
                     surface, (self.CHAR_CARD_WIDTH * self.width, self.CHAR_CARD_HEIGHT * self.height)
                 )
 
-            if filename == filename.startswith("cok_"):
+            if filename.startswith("cok_"):
                 img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
                 h, w = img_rgba.shape[:2]
                 
@@ -2634,9 +2640,13 @@ class game_ui:
             self.screen.blit(splash_img, (0, 0))
 
     def draw_kracken_event(self):
-        event = self.game_state["kracken_event"]
-        event_img = event["img"]
-        event_screen = self.ui_images.get(event_img)
+        event = self.game_state.get("kracken_event")
+        if event is None:
+            self.draw_kracken_splash()
+            return
+
+        event_img = event.get("img")
+        event_screen = self.ui_images.get(event_img) if event_img else None
         if event_screen is not None:
             self.screen.blit(event_screen, (0, 0))
 
