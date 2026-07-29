@@ -1495,6 +1495,7 @@ class ServerGameplay:
         if event == "Scorpion Smash":
             scorpion = tableau["scorpion"] 
             decks["scorpions"].insert(0, scorpion)
+            tableau["scorpion"] = []
         
         game_state["phase"] = "start_turn"      
         return game_state
