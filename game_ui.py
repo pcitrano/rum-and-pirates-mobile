@@ -162,6 +162,8 @@ class game_ui:
         self.kracken_ui_timer = 0
         self.kracken_seen_round = None     # round number we've already started timing for
 
+        self.character_reveal_start = None  # client-local timer, not stored in game_state
+
         self.save_data = save_data
         self.game_state = game_state 
         self.rules = rules
@@ -214,6 +216,8 @@ class game_ui:
         self.chat_input_text = ""
         self.chat_read_messages = None
         self.chat_notification = False
+        self.watch_image = pygame.image.load("thin_client_assets/UI Images/watch.png").convert_alpha()
+        self.watch_emoji = pygame.transform.smoothscale(self.watch_image,(20, 30))
 
         if self.rules is not None:
             self.rules.broadcast = self.broadcast_state
@@ -237,9 +241,12 @@ class game_ui:
             self.poll_network()
 
             if self.game_state.get("phase") == "character_reveal":
-                elapsed = pygame.time.get_ticks() - self.game_state.get("reveal_start_time", 0)
-                if elapsed > 5000:
+                if self.character_reveal_start is None:
+                    self.character_reveal_start = pygame.time.get_ticks()
+                elif pygame.time.get_ticks() - self.character_reveal_start > 5000:
                     self.finish_character_reveal()
+            else:
+                self.character_reveal_start = None
 
             try:
                 self.update_kracken_timers()
@@ -375,6 +382,17 @@ class game_ui:
                     surface, (int(295/1600*self.width), int(500/900*self.height))
                 )
 
+            if filename == "Watch.png":
+                img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+                h, w = img_rgba.shape[:2]
+                
+                surface = pygame.image.frombuffer(img_rgba.tobytes(), (w, h), "RGBA")
+                surface = surface.convert_alpha()  # ensures per-pixel alpha is properly set
+                
+                self.ui_images[filename] = pygame.transform.smoothscale(
+                surface, (20, 30)
+                    )
+
             if filename == "Refresh.png":
                 img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
                 h, w = img_rgba.shape[:2]
@@ -397,7 +415,7 @@ class game_ui:
                     surface, (self.CHAR_CARD_WIDTH * self.width, self.CHAR_CARD_HEIGHT * self.height)
                 )
 
-            if filename.startswith("cok_"):
+            if filename == filename.startswith("cok_"):
                 img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
                 h, w = img_rgba.shape[:2]
                 
@@ -496,7 +514,7 @@ class game_ui:
             else:
                 self.game_state["menu"]["player_names"][field] = self.game_state["menu"]["player_names"][field][:-1]
         
-        elif len(event.unicode) == 1:
+        elif len(event.unicode) == 1 and event.unicode.isprintable():
             if field == "room_code":
                 self.game_state["menu"]["room_code_input"] += event.unicode.upper()
             elif field == "chat":
@@ -2150,28 +2168,57 @@ class game_ui:
 
     def draw_wrapped_text_up(self, font, text, x, y, max_width, color):
 
-        words = text.split()
-
-        lines = []
-        current = ""
-
-        for word in words:
-            test = current + (" " if current else "") + word
-
-            if font.size(test)[0] <= max_width:
-                current = test
+        raw_tokens = text.split()
+        tokens = []
+        watch_icon = self.watch_emoji
+    
+        for token in raw_tokens:
+            if token == "[watch]":
+                tokens.append({"type": "image", "surface": watch_icon, "width": watch_icon.get_width()})
             else:
-                lines.append(current)
-                current = word
+                tokens.append({"type": "text", "content": token, "width": font.size(token)[0]})
 
-        if current:
-            lines.append(current)
+        space_width = font.size(" ")[0]
+        line_height = max(font.get_linesize(), watch_icon.get_height() if watch_icon else 0)
 
-        line_height = font.get_linesize()
+        # 2. Build lines based on token widths
+        lines = []
+        current_line = []
+        current_width = 0
 
+        for token in tokens:
+            # Extra space width needed if line isn't empty
+            add_space = space_width if current_line else 0
+        
+            if current_width + add_space + token["width"] <= max_width:
+                current_line.append(token)
+                current_width += add_space + token["width"]
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = [token]
+                current_width = token["width"]
+
+        if current_line:
+            lines.append(current_line)
+
+        # 3. Draw lines bottom-to-top
         for line in reversed(lines):
-            label = font.render(line, True, color)
-            self.screen.blit(label, (x, y))
+            current_x = x
+            for token in line:
+                if token["type"] == "text":
+                    label = font.render(token["content"], True, color)
+                    # Vertically center text if the icon is taller than the font line height
+                    text_y = y + (line_height - label.get_height()) // 2
+                    self.screen.blit(label, (current_x, text_y))
+                    current_x += token["width"] + space_width
+
+                elif token["type"] == "image":
+                    # Vertically center icon relative to line height
+                    icon_y = y + (line_height - token["surface"].get_height()) // 2
+                    self.screen.blit(token["surface"], (current_x, icon_y))
+                    current_x += token["width"] + space_width
+
             y -= line_height
 
         return y
@@ -2599,7 +2646,7 @@ class game_ui:
         built and rescaled the board.  We just clean up local animation state
         and rebuild buttons.
         """
-        self.game_state.pop("reveal_start_time", None)
+        self.character_reveal_start = None
         self.build_buttons()
 
     # ── Kracken event ─────────────────────────────────────────────────────
