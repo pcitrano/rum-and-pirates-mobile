@@ -216,8 +216,6 @@ class game_ui:
         self.chat_input_text = ""
         self.chat_read_messages = None
         self.chat_notification = False
-        self.watch_image = pygame.image.load("thin_client_assets/UI Images/watch.png").convert_alpha()
-        self.watch_emoji = pygame.transform.smoothscale(self.watch_image,(20, 30))
 
         if self.rules is not None:
             self.rules.broadcast = self.broadcast_state
@@ -415,7 +413,7 @@ class game_ui:
                     surface, (self.CHAR_CARD_WIDTH * self.width, self.CHAR_CARD_HEIGHT * self.height)
                 )
 
-            if filename == filename.startswith("cok_"):
+            if filename.startswith("cok_"):
                 img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
                 h, w = img_rgba.shape[:2]
                 
@@ -1383,6 +1381,8 @@ class game_ui:
     def draw_chat(self):
         if not self.chat_open:
             return
+
+        watch_emoji = self.ui_images["Watch.png"]
         
         width = int(800 / 1600 * self.width)
         base_height = int(200 / 900 * self.height)
@@ -1413,7 +1413,7 @@ class game_ui:
         # Messages 
         message_y = input_rect.y - 32
         for message in reversed(self.chat_messages[-10:]):
-            message_y = self.draw_wrapped_text_up(self.font, f'{message["player"]}: {message["text"]}', x + 8, message_y, width - 16, (255,255,255))
+            message_y = self.draw_wrapped_text_up(self.font, f'{message["player"]}: {message["text"]}', x + 8, message_y, width - 16, (255,255,255), watch_emoji)
             message_y -= 4
     
     def toggle_chat(self):
@@ -2166,11 +2166,10 @@ class game_ui:
 
         return y  # return updated y so the caller knows where to continue
 
-    def draw_wrapped_text_up(self, font, text, x, y, max_width, color):
+    def draw_wrapped_text_up(self, font, text, x, y, max_width, color, watch_icon):
 
         raw_tokens = text.split()
         tokens = []
-        watch_icon = self.watch_emoji
     
         for token in raw_tokens:
             if token == "[watch]":
