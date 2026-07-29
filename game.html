@@ -251,6 +251,35 @@
     padding: 14px;
   }
   #inventory-overlay.open { display: flex; }
+
+  /* ── Kracken event: full-screen splash/card, above everything else ── */
+  #kracken-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    cursor: default;
+  }
+  #kracken-overlay.open { display: flex; }
+  #kracken-overlay.clickable { cursor: pointer; }
+  #kracken-overlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  #kracken-hint {
+    position: absolute;
+    bottom: 30px; left: 0; right: 0;
+    text-align: center;
+    color: var(--parchment);
+    font-family: 'Pirata One', cursive;
+    font-size: 1.1rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
   #inventory-overlay h3 {
     font-family: 'Pirata One', cursive;
     color: var(--gold-light);
@@ -623,12 +652,6 @@
       </div>
       <!-- Wrangle screen: covers only the board, leaves status bar and tableau visible -->
       <div id="wrangle-screen"></div>
-      <div id="kracken-overlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:black; z-index:200;">
-        <img id="kracken-image"
-          style="max-width:100%;max-height:100%;object-fit:contain;">
-        <div id="kracken-hint" style="position:absolute; bottom:30px; width:100%; text-align:center; color:white; font-family:'Pirata One',cursive; font-size:2rem;">
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -664,6 +687,12 @@
   <button id="log-close" onclick="toggleInventory()">Close</button>
 </div>
 
+<!-- Kracken event overlay -->
+<div id="kracken-overlay" onclick="krackenOverlayClicked()">
+  <img id="kracken-image" src="" alt="">
+  <div id="kracken-hint"></div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -681,6 +710,12 @@ let myRoomId = null;
 let myPlayerIndex = null;
 let chatMessages = [];
 let unreadChatCount = 0;
+
+// Kracken event UI state — client-local timing, not synced over network,
+// same approach as the thin client (each browser times its own sequence).
+let krackenUiState = null;      // null | "splash" | "card"
+let krackenSeenRound = null;    // round number we've already started timing for
+let krackenTimerHandle = null;
 let tileData = [];       // raw JSON for all 9 tiles
 let tileImages = [];     // loaded Image objects
 let boardSpaces = [];    // computed spaces with board_x, board_y
@@ -691,10 +726,6 @@ let offsetY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
 let lastTouchDist = 0;
-
-let krackenUiState = null;      // null | "splash" | "card"
-let krackenTimer = 0;
-let krackenSeenRound = null;
 
 // ── Board generation (mirrors GameSetup.py) ───────────────────────────────────
 function rotateNormalized(x, y, rotation) {
@@ -900,16 +931,9 @@ function initBoardSize() {
 }
 
 canvas.addEventListener("pointerdown", e => {
-  if (gameState?.phase === "start_kracken") {
-        if (myPlayerIndex === gameState.starting_player) {
-            finishKrackenEvent();
-        }
-        return;
-    }
-
-    isPanning = true;
-    panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
-    canvas.setPointerCapture(e.pointerId);
+  isPanning = true;
+  panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
+  canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener("pointermove", e => {
   if (!isPanning) return;
@@ -1265,7 +1289,65 @@ function renderContestOverlay() {
 }
 
 // ── Wrangle screen ────────────────────────────────────────────────────────────
-function renderWrangleScreen() {
+// ── Kracken event ──────────────────────────────────────────────────────────
+function updateKrackenSequence() {
+  const round = gameState.round;
+  if (round !== krackenSeenRound) {
+    // A new kracken event just arrived — (re)start the splash sequence.
+    krackenSeenRound = round;
+    krackenUiState = "splash";
+    if (krackenTimerHandle) clearTimeout(krackenTimerHandle);
+    renderKrackenOverlay();
+    krackenTimerHandle = setTimeout(() => {
+      krackenUiState = "card";
+      renderKrackenOverlay();
+      krackenTimerHandle = setTimeout(() => {
+        finishKrackenEvent();
+      }, 5000);
+    }, 5000);
+  } else {
+    // Already timing this event (e.g. a state_updated arrived mid-sequence
+    // for an unrelated reason) — just make sure the overlay reflects it.
+    renderKrackenOverlay();
+  }
+}
+
+function renderKrackenOverlay() {
+  const overlay = document.getElementById("kracken-overlay");
+  const img = document.getElementById("kracken-image");
+  const hint = document.getElementById("kracken-hint");
+  const startingPlayer = gameState.starting_player || 0;
+  const isStartingPlayer = myPlayerIndex === startingPlayer;
+
+  overlay.classList.add("open");
+
+  if (krackenUiState === "card") {
+    const event = gameState.kracken_event;
+    img.src = event ? `${SERVER}/assets/kracken/${encodeURIComponent(event.img)}` : "";
+    hint.textContent = isStartingPlayer ? "Tap to continue" : "Waiting for starting player...";
+    overlay.classList.toggle("clickable", isStartingPlayer);
+  } else {
+    img.src = `${SERVER}/assets/kracken/${encodeURIComponent("kracken.jpg")}`;
+    hint.textContent = "";
+    overlay.classList.remove("clickable");
+  }
+}
+
+function krackenOverlayClicked() {
+  const startingPlayer = gameState.starting_player || 0;
+  if (krackenUiState === "card" && myPlayerIndex === startingPlayer) {
+    finishKrackenEvent();
+  }
+}
+
+function finishKrackenEvent() {
+  if (krackenTimerHandle) { clearTimeout(krackenTimerHandle); krackenTimerHandle = null; }
+  krackenUiState = null;
+  document.getElementById("kracken-overlay").classList.remove("open");
+  socket.emit("player_action", { room_id: myRoomId, type: "confirm_kracken" });
+}
+
+
   const screen = document.getElementById("wrangle-screen");
   screen.classList.add("open");
 
@@ -1331,66 +1413,7 @@ function renderWrangleScreen() {
         : ""}
     </div>
   `;
-}
 
-// ── Wrangle screen ────────────────────────────────────────────────────────────
-function updateKrackenTimers() {
-    if (!gameState || gameState.phase !== "start_kracken") {
-        krackenUiState = null;
-        krackenSeenRound = null;
-        document.getElementById("kracken-overlay").style.display = "none";
-        return;
-    }
-
-    if (gameState.round !== krackenSeenRound) {
-        krackenSeenRound = gameState.round;
-        krackenUiState = "splash";
-        krackenTimer = Date.now();
-        showKrackenSplash();
-        return;
-    }
-
-    const elapsed = Date.now() - krackenTimer;
-    if (krackenUiState === "splash" && elapsed > 5000) {
-        krackenUiState = "card";
-        krackenTimer = Date.now();
-        showKrackenCard();
-    }
-    else if (krackenUiState === "card" && elapsed > 5000) {
-        finishKrackenEvent();
-    }
-}
-
-function showKrackenSplash() {
-    const overlay = document.getElementById("kracken-overlay");
-    document.getElementById("kracken-image").src =
-        `${SERVER}/assets/kracken/kracken.jpg`;
-    document.getElementById("kracken-hint").textContent = "";
-    overlay.style.display = "flex";
-}
-
-function showKrackenCard() {
-    const overlay = document.getElementById("kracken-overlay");
-    document.getElementById("kracken-image").src =
-        `${SERVER}/assets/kracken/${gameState.kracken_event.img}`;
-    const startingPlayer = gameState.starting_player || 0;
-    document.getElementById("kracken-hint").textContent =
-        myPlayerIndex === startingPlayer
-            ? "Click to continue"
-            : "Waiting for starting player...";
-    overlay.style.display = "flex";
-}
-
-function finishKrackenEvent() {
-    document.getElementById("kracken-overlay").style.display = "none";
-    krackenUiState = null;
-    socket.emit("game_action", {
-        room_id: myRoomId,
-        action: {
-            type: "confirm_kracken"
-        }
-    });
-}
 
 // ── Game over ─────────────────────────────────────────────────────────────────
 function renderGameOver() {
@@ -1465,13 +1488,21 @@ function updateUI() {
   if (gameState.phase === "character_select") {
     document.getElementById("game-area").style.display = "none";
     document.getElementById("wrangle-screen").classList.remove("open");
+    document.getElementById("kracken-overlay").classList.remove("open");
     document.getElementById("action-panel").classList.remove("open");
+    krackenUiState = null;
+    krackenSeenRound = null;
+    if (krackenTimerHandle) { clearTimeout(krackenTimerHandle); krackenTimerHandle = null; }
     renderCharacterSelect();
     return;
   } else if (gameState.phase === "game_over") {
     document.getElementById("game-area").style.display = "none";
     document.getElementById("wrangle-screen").classList.remove("open");
+    document.getElementById("kracken-overlay").classList.remove("open");
     document.getElementById("action-panel").classList.remove("open");
+    krackenUiState = null;
+    krackenSeenRound = null;
+    if (krackenTimerHandle) { clearTimeout(krackenTimerHandle); krackenTimerHandle = null; }
     renderGameOver();
     return;
   } else if (wrangleActive) {
@@ -1482,9 +1513,18 @@ function updateUI() {
     if (goOverlay) goOverlay.remove();
     renderWrangleScreen();
     return;
+  } else if (gameState.phase === "start_kracken") {
+    document.getElementById("game-area").style.display = "flex";
+    document.getElementById("wrangle-screen").classList.remove("open");
+    updateKrackenSequence();
+    return;
   } else {
     document.getElementById("game-area").style.display = "flex";
     document.getElementById("wrangle-screen").classList.remove("open");
+    document.getElementById("kracken-overlay").classList.remove("open");
+    krackenUiState = null;
+    krackenSeenRound = null;
+    if (krackenTimerHandle) { clearTimeout(krackenTimerHandle); krackenTimerHandle = null; }
     const overlay = document.getElementById("character-select-overlay");
     if (overlay) overlay.remove();
     const goOverlay = document.getElementById("game-over-overlay");
@@ -1496,7 +1536,6 @@ function updateUI() {
 
   renderTableau();
   renderContestOverlay();
-  updateKrackenTimers();
 
   if (document.getElementById("inventory-overlay").classList.contains("open")) {
     renderInventory();
@@ -1963,10 +2002,7 @@ function renderChat() {
   list.innerHTML = chatMessages.map(m => {
     let text = escapeHtml(m.text || "");
     // Replace [watch] with the HTML watch emoji
-    text = text.replaceAll(
-      "[watch]",
-      '<span class="chat-emoji">⌚</span>'
-    );
+    text = text.replaceAll("[watch]", '<span class="chat-emoji">⌚</span>');
     return `
       <p>
         <span class="chat-author">
