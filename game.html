@@ -1347,7 +1347,7 @@ function finishKrackenEvent() {
   socket.emit("player_action", { room_id: myRoomId, type: "confirm_kracken" });
 }
 
-
+function renderWrangleScreen() {
   const screen = document.getElementById("wrangle-screen");
   screen.classList.add("open");
 
@@ -1413,7 +1413,7 @@ function finishKrackenEvent() {
         : ""}
     </div>
   `;
-
+}
 
 // ── Game over ─────────────────────────────────────────────────────────────────
 function renderGameOver() {
