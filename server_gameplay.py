@@ -1467,6 +1467,7 @@ class ServerGameplay:
         if event == "Lost at Sea":
             for card in tableau["maps"]:
                 decks["maps"].insert(0, card)
+            tableau["maps"] = []
             random.shuffle(decks["maps"])
             if len(decks["maps"]) < 4:
                 for _ in range(len(decks["maps"])):
@@ -1478,6 +1479,7 @@ class ServerGameplay:
         if event == "Blackout":
             for card in tableau["pubs"]:
                 decks["pubs"].insert(0, card)
+            tableau["pubs"] = []
             random.shuffle(decks["pubs"])
             if len(decks["pubs"]) < 4:
                 for _ in range(len(decks["pubs"])):

@@ -3153,6 +3153,30 @@ class game_ui:
                 int(k): int(v) for k, v in state["coin_lookup"].items()
             }
 
+        if "legal_moves" in state:
+            normalised_moves = []
+            for move in state["legal_moves"]:
+                m = dict(move)
+                if "destination" in m:
+                    m["destination"] = int(m["destination"])
+                if "path" in m:
+                    m["path"] = [int(p) for p in m["path"]]
+                normalised_moves.append(m)
+            self.game_state["legal_moves"] = normalised_moves
+
+        if "occupied_paths" in state:
+            normalised_paths = []
+            for path in state["occupied_paths"]:
+                p = dict(path)
+                if "path" in p:
+                    p["path"] = [int(x) for x in p["path"]]
+                if "start" in p:
+                    p["start"] = int(p["start"])
+                if "destination" in p:
+                    p["destination"] = int(p["destination"])
+                normalised_paths.append(p)
+            self.game_state["occupied_paths"] = normalised_paths
+
         if "board_seed" in state:
             current_seed = self.game_state.get("board_seed")
             if state["board_seed"] != current_seed or self.game_state.get("board") is None:

@@ -719,6 +719,7 @@ let krackenTimerHandle = null;
 let tileData = [];       // raw JSON for all 9 tiles
 let tileImages = [];     // loaded Image objects
 let boardSpaces = [];    // computed spaces with board_x, board_y
+let currentBoardSeed = null; // JSON of the seed the board was last built from
 let spaceLoookup = {};
 let scale = 1;
 let offsetX = 0;
@@ -2001,7 +2002,6 @@ function renderChat() {
   const wasNearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
   list.innerHTML = chatMessages.map(m => {
     let text = escapeHtml(m.text || "");
-    // Replace [watch] with the HTML watch emoji
     text = text.replaceAll("[watch]", '<span class="chat-emoji">⌚</span>');
     return `
       <p>
@@ -2212,12 +2212,16 @@ function connectToGame(name, roomId, playerIndex) {
       gameState.alley_lookup = fixed;
     }
 
-    if (gameState && gameState.board_seed && boardSpaces.length === 0) {
-      setLoading("Building board...");
-      const { allSpaces, spaceLookup } = buildBoardFromSeed(gameState.board_seed);
-      boardSpaces = allSpaces;
-      spaceLoookup = spaceLookup;
-      needsBoardSizing = true;
+    if (gameState && gameState.board_seed) {
+      const seedKey = JSON.stringify(gameState.board_seed);
+      if (seedKey !== currentBoardSeed) {
+        currentBoardSeed = seedKey;
+        setLoading("Building board...");
+        const { allSpaces, spaceLookup } = buildBoardFromSeed(gameState.board_seed);
+        boardSpaces = allSpaces;
+        spaceLoookup = spaceLookup;
+        needsBoardSizing = true;
+      }
     }
 
     updateUI();
