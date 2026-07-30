@@ -1536,7 +1536,7 @@ class game_ui:
             self.screen.blit(name_label, (name_x, y))
 
             # Draw remaining pirates
-            total_pirates = (15 - player["pirate_reserve"])
+            total_pirates = (self.game_state["max_pirates"] - player["pirate_reserve"])
             pirate_label = self.small_font.render(str(f"{player["pirates"]}/{total_pirates}"),True,player["color"])
             self.screen.blit(pirate_label, (pirate_x, y+5))
 
@@ -3211,6 +3211,7 @@ class game_ui:
     def apply_network_state(self, state):
         
         local_menu = self.game_state.get("menu")
+        previous_board_seed = self.game_state.get("board_seed")
 
         # legal_moves and occupied_paths are normalised below with int casting
         CLIENT_ONLY_KEYS = {"spaces", "space_lookup", "board", "legal_moves", "occupied_paths"}
@@ -3271,8 +3272,7 @@ class game_ui:
             self.game_state["occupied_paths"] = normalised_paths
 
         if "board_seed" in state:
-            current_seed = self.game_state.get("board_seed")
-            if state["board_seed"] != current_seed or self.game_state.get("board") is None:
+            if state["board_seed"] != previous_board_seed or self.game_state.get("board") is None:
                 board, all_spaces = self.setup.create_board_from_seed(state["board_seed"])
                 self.game_state["board"] = board
                 self.game_state["spaces"] = all_spaces
