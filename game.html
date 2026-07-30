@@ -328,6 +328,10 @@
     font-weight: bold;
     font-size: 0.9rem;
   }
+  .inv-card-wench .inv-card {
+    border: 2px solid #ffd700;
+    box-shadow: 0 0 8px 1px rgba(255, 215, 0, 0.7);
+  }
 
   /* ── Tableau side panel ── */
   #tableau-panel {
@@ -2091,7 +2095,12 @@ function renderInventory() {
   ];
 
   const html = groups.map(g => {
-    const cards = player[g.key] || [];
+    let cards = player[g.key] || [];
+    let wenchCard = null;
+    if (g.key === "rendezvous") {
+      wenchCard = player.wench_ren || null;
+      if (wenchCard) cards = [...cards, wenchCard];
+    }
     if (!cards.length) return "";
     const folder = CARD_FOLDERS_INV[g.key] || g.key;
     // Rendezvous cards only count toward score once completed
@@ -2104,7 +2113,7 @@ function renderInventory() {
         <div class="inv-group-label">${g.label} (${totalPoints} pts)</div>
         <div class="inv-cards">
           ${cards.map(c => `
-            <div class="inv-card-wrap">
+            <div class="inv-card-wrap${c === wenchCard ? ' inv-card-wench' : ''}">
               <img class="inv-card" src="${SERVER}/assets/${folder}/${c.image_file}" onerror="this.style.display='none'">
               ${g.key === "rendezvous" && c.completed ? '<div class="inv-card-completed-badge">✕</div>' : ''}
             </div>

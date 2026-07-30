@@ -1747,12 +1747,17 @@ class game_ui:
         if player is None:
             return
 
+        wench_card = player.get("wench_ren")
+        rendezvous_display = list(player["rendezvous"])
+        if wench_card:
+            rendezvous_display.append(wench_card)
+
         categories = [
             ("Wrangle", player["wrangles"]),
             ("Maps", player["maps"]),
             ("Pubs", player["pubs"]),
             ("Supplies", player["supplies"]),
-            ("Rendezvous", player["rendezvous"]),
+            ("Rendezvous", rendezvous_display),
             ("Guards", player["large_guard"] + player["small_guard"]),
             ("Treasure", player["treasure"]),
             ("Scorpions", player["scorpions"])
@@ -1779,10 +1784,13 @@ class game_ui:
                     row = idx // max_per_row
                     col = idx % max_per_row
                     card_x = x + 5 + col * (size + 2)
-                    self.screen.blit(img, (card_x, card_y + row * (size + 2)))
+                    card_y_pos = card_y + row * (size + 2)
+                    self.screen.blit(img, (card_x, card_y_pos))
                     if card.get("completed"):
                         star = self.font.render("*",True, (0,200,0))
-                        self.screen.blit(star, (card_x + (size - star.get_width())/2,card_y + row * (size + 2)))
+                        self.screen.blit(star, (card_x + (size - star.get_width())/2, card_y_pos))
+                    if title == "Rendezvous" and wench_card is not None and card is wench_card:
+                        pygame.draw.rect(self.screen, (255, 215, 0), (card_x - 2, card_y_pos - 2, size + 4, size + 4), 3)
 
             score = player["score"].get(title.lower(), 0)
             score_label = self.small_font.render(
