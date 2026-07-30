@@ -1373,6 +1373,35 @@ class game_ui:
         radius = max(8, int(15 * min(scale_x, scale_y)))
         pygame.draw.circle(self.screen,(255,0,0),(screen_x, screen_y), radius)
 
+        ############ Kracken Dark Alleys ##############
+        self.draw_dark_alley_effects(scale_x, scale_y, board_y)
+
+    def draw_dark_alley_effects(self, scale_x, scale_y, board_y):
+
+        barricade_active = self.game_state.get("barricade_active", False)
+        full_moon_active = self.game_state.get("full_moon_active", False)
+        if not barricade_active and not full_moon_active:
+            return
+
+        for space in self.game_state["spaces"]:
+            if space["type"] != "dark_alley":
+                continue
+            screen_x = self.board_x + int(space["board_x"] * scale_x)
+            screen_y = int(space["board_y"] * scale_y) + board_y
+
+            if full_moon_active:
+                radius = max(6, int(14 * min(scale_x, scale_y)))
+                pygame.draw.circle(self.screen, (255, 215, 0), (screen_x, screen_y), radius, 3)
+
+            if barricade_active:
+                size = max(5, int(10 * min(scale_x, scale_y)))
+                pygame.draw.line(self.screen, (200, 30, 30),
+                                  (screen_x - size, screen_y - size),
+                                  (screen_x + size, screen_y + size), 4)
+                pygame.draw.line(self.screen, (200, 30, 30),
+                                  (screen_x - size, screen_y + size),
+                                  (screen_x + size, screen_y - size), 4)
+
     ######################################################################
     # DRAWING — IN-GAME PANELS
     ######################################################################

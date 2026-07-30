@@ -304,7 +304,9 @@ class ServerGameSetup:
                 "scorpions": [],
                 "supplies": [],
                 "maps": [],
-                "wrangles": []
+                "wrangles": [],
+
+                "wench_ren": None
             })
 
         return players
@@ -384,6 +386,9 @@ class ServerGameSetup:
             {"event": "Blackout", "img": "cok_blackout.png"},
             {"event": "Sleepwalker", "img": "cok_sleepwalker.png"},
             {"event": "Scorpion Smash", "img": "cok_scorpion.png"},
+            {"event": "Wench's Wail", "img": "cok_wench.png"},
+            {"event": "Full Moon", "img": "cok_moon.png"},
+            {"event": "Barricade", "img": "cok_barricade.png"},
         ]
 
         random.shuffle(kracken)
@@ -449,6 +454,8 @@ class ServerGameSetup:
             "kracken_deck": [],
             "kracken_event": None,
             "kracken_events_enabled": kracken_events,
+            "full_moon_active": False,
+            "barricade_active": False,
         }
 
         if play_with_characters:

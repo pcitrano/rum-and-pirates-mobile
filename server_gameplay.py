@@ -129,12 +129,18 @@ class ServerGameplay:
         for occupied_path in game_state["occupied_paths"]:
             occupied_spaces.update(occupied_path["path"])
 
+        barricade_active = game_state.get("barricade_active", False)
+        alley_spaces = game_state.get("alley_lookup", {})
+
         legal_moves = []
         for move in game_state["captain_graph"][str(captain_space_id)] \
                 if str(captain_space_id) in game_state["captain_graph"] \
                 else game_state["captain_graph"][captain_space_id]:
-            if not any(space_id in occupied_spaces for space_id in move["path"]):
-                legal_moves.append(move)
+            if any(space_id in occupied_spaces for space_id in move["path"]):
+                continue
+            if barricade_active and any(space_id in alley_spaces for space_id in move["path"]):
+                continue
+            legal_moves.append(move)
         return legal_moves
 
     def refresh_legal_moves(self, game_state):
@@ -206,6 +212,11 @@ class ServerGameplay:
             all_dark_alley = all(
                 m["destination_type"] == "dark_alley" for m in game_state["legal_moves"]
             )
+
+            # Force free dark alleys during full moon
+            if game_state["full_moon_active"]:
+                all_dark_alley = True
+
             if all_dark_alley:
                 game_state["phase"] = "dark_alley_start"
             else:
@@ -259,14 +270,22 @@ class ServerGameplay:
             else game_state["captain_graph"][str(destination_id)]
 
         rendezvous_scored = False
-        for card in player["rendezvous"]:
-            if card["completed"]:
-                continue
-            if self.rendezvous_check(card, new_space):
-                card["completed"] = True
-                rendezvous_scored = True
-                self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
-                break
+
+        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space):
+            player["wench_ren"]["completed"] = True 
+            rendezvous_scored = True
+            self.log_action(game_state, f"{player['name']} had a romantic evening with a special wench.")
+            player["rendezvous"].append(player["wench_ren"]) 
+            player["wench_ren"] = None
+        else:           
+            for card in player["rendezvous"]:
+                if card["completed"]:
+                    continue
+                if self.rendezvous_check(card, new_space):
+                    card["completed"] = True
+                    rendezvous_scored = True
+                    self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
+                    break
 
         sterling_free_move = False
         if player["character"] is not None:
@@ -401,13 +420,19 @@ class ServerGameplay:
         game_state["legal_moves"] = game_state["captain_graph"].get(game_state["captain_space"]) \
             or game_state["captain_graph"].get(str(game_state["captain_space"]))
 
-        for card in player["rendezvous"]:
-            if card["completed"]:
-                continue
-            if self.rendezvous_check(card, new_space):
-                card["completed"] = True
-                self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
-                break
+        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space):
+            player["wench_ren"]["completed"] = True 
+            self.log_action(game_state, f"{player['name']} had a romantic evening with a special wench.")
+            player["rendezvous"].append(player["wench_ren"]) 
+            player["wench_ren"] = None
+        else:
+            for card in player["rendezvous"]:
+                if card["completed"]:
+                    continue
+                if self.rendezvous_check(card, new_space):
+                    card["completed"] = True
+                    self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
+                    break
 
         game_state["dark_alley"] = {}
         self.score_players(game_state)
@@ -1327,6 +1352,10 @@ class ServerGameplay:
             if player["character"] is not None and player["character"]["name"] == "Captain Midas the Master of Coin":
                 player["coins"] += 1
 
+            if player["wench_ren"]:
+                game_state["decks"]["rendezvous"].insert(0,player["wench_ren"])
+                player["wench_ren"] = None
+
         game_state["starting_player"] = (game_state["starting_player"] + 1) % len(game_state["players"])
         game_state["active_player"] = game_state["starting_player"]
 
@@ -1337,6 +1366,9 @@ class ServerGameplay:
             game_state["kracken_event"] = game_state["kracken_deck"].pop()
             game_state["phase"] = "start_kracken" 
             return game_state
+
+        game_state["full_moon_active"] = False
+        game_state["barricade_active"] = False
         
         game_state["phase"] = "start_turn"
 
@@ -1401,6 +1433,7 @@ class ServerGameplay:
         event = game_state["kracken_event"]["event"]
         tableau = game_state["tableau"] 
         decks = game_state["decks"] 
+        players = game_state["players"]
 
         if event == "Whirlpool":
             # Rotate the tile the captain is standing on by 180 degrees.
@@ -1496,6 +1529,20 @@ class ServerGameplay:
             scorpion = tableau["scorpion"] 
             decks["scorpions"].insert(0, scorpion)
             tableau["scorpion"] = []
-        
+
+        if event == "Wench's Wail":
+            if len(decks["rendezvous"]) < len(players):
+                self.log_action(game_state,"Not enough rendezvous tiles remain!")
+                return game_state
+            else:
+                for player in players:
+                    player["wench_ren"] = decks["rendezvous"].pop() 
+
+        if event == "Full Moon": 
+            game_state["full_moon_active"] = True
+
+        if event == "Barricade": 
+            game_state["barricade_active"] = True        
+
         game_state["phase"] = "start_turn"      
         return game_state

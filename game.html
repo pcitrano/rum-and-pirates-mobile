@@ -875,6 +875,38 @@ function renderBoard() {
     ctx.restore();
   });
 
+  // Kracken event overlays for dark alley spaces:
+  //   Barricade  — red X (blocked for the round)
+  //   Full Moon  — gold ring (free for the round)
+  const barricadeActive = gameState.barricade_active;
+  const fullMoonActive = gameState.full_moon_active;
+  if (barricadeActive || fullMoonActive) {
+    boardSpaces.forEach(space => {
+      if (space.type !== "dark_alley") return;
+      const { board_x: bx, board_y: by } = space;
+
+      if (fullMoonActive) {
+        ctx.beginPath();
+        ctx.arc(bx, by, 16, 0, Math.PI * 2);
+        ctx.strokeStyle = "#ffd700";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      if (barricadeActive) {
+        const size = 10;
+        ctx.strokeStyle = "#c81e1e";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(bx - size, by - size);
+        ctx.lineTo(bx + size, by + size);
+        ctx.moveTo(bx - size, by + size);
+        ctx.lineTo(bx + size, by - size);
+        ctx.stroke();
+      }
+    });
+  }
+
   // Draw space overlays
   const captainPos = gameState.captain_space;
   const legalMoves = gameState.legal_moves || [];
