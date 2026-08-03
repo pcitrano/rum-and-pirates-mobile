@@ -1362,13 +1362,13 @@ class ServerGameplay:
         game_state["occupied_paths"] = []
         self.refresh_legal_moves(game_state)
 
+        game_state["full_moon_active"] = False
+        game_state["barricade_active"] = False
+
         if game_state["kracken_deck"]:
             game_state["kracken_event"] = game_state["kracken_deck"].pop()
             game_state["phase"] = "start_kracken" 
             return game_state
-
-        game_state["full_moon_active"] = False
-        game_state["barricade_active"] = False
         
         game_state["phase"] = "start_turn"
 
