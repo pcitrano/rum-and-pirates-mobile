@@ -1524,6 +1524,7 @@ class ServerGameplay:
         if event == "Sleepwalker":
             hammock = tableau["wrangle_hammock"]
             decks["wrangle_hammock"].insert(0, hammock)
+            tableau["wrangle_hammock"] = None
 
         if event == "Scorpion Smash":
             scorpion = tableau["scorpion"] 
