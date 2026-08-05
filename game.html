@@ -332,6 +332,15 @@
     border: 2px solid #ffd700;
     box-shadow: 0 0 8px 1px rgba(255, 215, 0, 0.7);
   }
+  .inv-card-prudes .inv-card {
+    border: 2px solid #cc0000;
+    box-shadow: 0 0 8px 1px rgba(204, 0, 0, 0.7);
+  }
+  /* When both wench gold and prudes red apply, red wins (drawn on top) */
+  .inv-card-wench.inv-card-prudes .inv-card {
+    border: 2px solid #cc0000;
+    box-shadow: 0 0 8px 1px rgba(204, 0, 0, 0.7);
+  }
 
   /* ── Tableau side panel ── */
   #tableau-panel {
@@ -2082,6 +2091,8 @@ function renderInventory() {
   const player = gameState.players[myPlayerIndex];
   if (!player) { content.innerHTML = ""; return; }
 
+  const prudesActive = gameState.prudes_active || false;
+
   const groups = [
     { key: "pubs", label: "Pubs" },
     { key: "maps", label: "Maps" },
@@ -2112,12 +2123,19 @@ function renderInventory() {
       <div>
         <div class="inv-group-label">${g.label} (${totalPoints} pts)</div>
         <div class="inv-cards">
-          ${cards.map(c => `
-            <div class="inv-card-wrap${c === wenchCard ? ' inv-card-wench' : ''}">
+          ${cards.map(c => {
+            const isWench = c === wenchCard;
+            const isPrudesRen = g.key === "rendezvous" && prudesActive;
+            const extraClasses = [
+              isWench ? "inv-card-wench" : "",
+              isPrudesRen ? "inv-card-prudes" : ""
+            ].filter(Boolean).join(" ");
+            return `
+            <div class="inv-card-wrap${extraClasses ? " " + extraClasses : ""}">
               <img class="inv-card" src="${SERVER}/assets/${folder}/${c.image_file}" onerror="this.style.display='none'">
               ${g.key === "rendezvous" && c.completed ? '<div class="inv-card-completed-badge">✕</div>' : ''}
             </div>
-          `).join("")}
+          `}).join("")}
         </div>
       </div>
     `;

@@ -1752,6 +1752,8 @@ class game_ui:
         if wench_card:
             rendezvous_display.append(wench_card)
 
+        prudes_active = self.game_state.get("prudes_active", False)
+
         categories = [
             ("Wrangle", player["wrangles"]),
             ("Maps", player["maps"]),
@@ -1789,8 +1791,11 @@ class game_ui:
                     if card.get("completed"):
                         star = self.font.render("*",True, (0,200,0))
                         self.screen.blit(star, (card_x + (size - star.get_width())/2, card_y_pos))
-                    if title == "Rendezvous" and wench_card is not None and card is wench_card:
-                        pygame.draw.rect(self.screen, (255, 215, 0), (card_x - 2, card_y_pos - 2, size + 4, size + 4), 3)
+                    if title == "Rendezvous":
+                        if wench_card is not None and card is wench_card:
+                            pygame.draw.rect(self.screen, (255, 215, 0), (card_x - 2, card_y_pos - 2, size + 4, size + 4), 3)
+                        if prudes_active:
+                            pygame.draw.rect(self.screen, (255, 0, 0), (card_x - 2, card_y_pos - 2, size + 4, size + 4), 3)
 
             score = player["score"].get(title.lower(), 0)
             score_label = self.small_font.render(

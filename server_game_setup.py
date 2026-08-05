@@ -389,6 +389,8 @@ class ServerGameSetup:
             {"event": "Wench's Wail", "img": "cok_wench.png"},
             {"event": "Full Moon", "img": "cok_moon.png"},
             {"event": "Barricade", "img": "cok_barricade.png"},
+            {"event": "Bermuda Triangle", "img": "cok_bermuda.png"},
+            {"event": "Prudes Prevail", "img": "cok_prudes.png"},
         ]
 
         random.shuffle(kracken)
@@ -451,11 +453,13 @@ class ServerGameSetup:
 
             "tableau": tableau,
             "decks": decks,
+
             "kracken_deck": [],
             "kracken_event": None,
             "kracken_events_enabled": kracken_events,
             "full_moon_active": False,
             "barricade_active": False,
+            "prudes_active": False,
         }
 
         if play_with_characters:

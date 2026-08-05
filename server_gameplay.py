@@ -1543,7 +1543,16 @@ class ServerGameplay:
             game_state["full_moon_active"] = True
 
         if event == "Barricade": 
-            game_state["barricade_active"] = True        
+            game_state["barricade_active"] = True    
+
+        if event == "Bermuda Triangle":
+            old_space = game_state["space_lookup"][game_state["captain_space"]]
+            old_space["captain"] = False
+            new_space_id = 20
+            new_space = game_state["space_lookup"][new_space_id]
+            game_state["captain_space"] = new_space_id
+            new_space["captain"] = True
+            game_state["legal_moves"] = self.refresh_legal_moves(game_state)    
 
         game_state["phase"] = "start_turn"      
         return game_state
