@@ -1632,7 +1632,7 @@ class game_ui:
         self.screen.blit(img, (treasure_x, y))
 
         card = tableau["scorpion"]
-        image_key = card.get("image_file") 
+        image_key = card.get("image_file")
         scorpion_x = treasure_x + card_width + 2* padding
         img = pygame.transform.smoothscale(self.card_images[image_key], (card_width, card_height))
         self.screen.blit(img, (scorpion_x, y))
@@ -1646,7 +1646,7 @@ class game_ui:
         self.screen.blit(wrangle_label, (wrangle_label_x, y))
 
         card = tableau["wrangle_bunk"]
-        image_key = card.get("image_file") 
+        image_key = card.get("image_file")
         bunk_x = self.right_panel_x + ( self.right_panel_width -  (3 * card_width + 4 * padding)) / 2
         y += 35 / 750 * self.board_height
         img = pygame.transform.smoothscale(self.card_images[image_key], (card_width, card_height))

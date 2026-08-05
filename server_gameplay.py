@@ -1529,7 +1529,7 @@ class ServerGameplay:
         if event == "Scorpion Smash":
             scorpion = tableau["scorpion"] 
             decks["scorpions"].insert(0, scorpion)
-            tableau["scorpion"] = []
+            tableau["scorpion"] = None
 
         if event == "Wench's Wail":
             if len(decks["rendezvous"]) < len(players):
