@@ -162,7 +162,10 @@ class ServerGameplay:
                 return coin_space_id
         return None
 
-    def rendezvous_check(self, card, space):
+    def rendezvous_check(self, card, space, game_state):
+        if game_state.get("prudes_active", False):
+            return False
+
         space_type = space["type"]
         dest = card["destination"]
         if dest == "pub":
@@ -271,7 +274,7 @@ class ServerGameplay:
 
         rendezvous_scored = False
 
-        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space):
+        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space, game_state):
             player["wench_ren"]["completed"] = True 
             rendezvous_scored = True
             self.log_action(game_state, f"{player['name']} had a romantic evening with a special wench.")
@@ -281,7 +284,7 @@ class ServerGameplay:
             for card in player["rendezvous"]:
                 if card["completed"]:
                     continue
-                if self.rendezvous_check(card, new_space):
+                if self.rendezvous_check(card, new_space, game_state):
                     card["completed"] = True
                     rendezvous_scored = True
                     self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
@@ -420,7 +423,7 @@ class ServerGameplay:
         game_state["legal_moves"] = game_state["captain_graph"].get(game_state["captain_space"]) \
             or game_state["captain_graph"].get(str(game_state["captain_space"]))
 
-        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space):
+        if player["wench_ren"] and self.rendezvous_check(player["wench_ren"], new_space, game_state):
             player["wench_ren"]["completed"] = True 
             self.log_action(game_state, f"{player['name']} had a romantic evening with a special wench.")
             player["rendezvous"].append(player["wench_ren"]) 
@@ -429,7 +432,7 @@ class ServerGameplay:
             for card in player["rendezvous"]:
                 if card["completed"]:
                     continue
-                if self.rendezvous_check(card, new_space):
+                if self.rendezvous_check(card, new_space, game_state):
                     card["completed"] = True
                     self.log_action(game_state, f"{player['name']} had a romantic evening with his wench <3")
                     break
@@ -452,7 +455,6 @@ class ServerGameplay:
             self.log_action(game_state, f"{player['name']} found a lucky coin.")
             return self.coin_space(game_state, player)
         elif space["type"] == "recruit":
-            self.log_action(game_state, f"{player['name']} added an ally to their cause.")
             return self.recruit_space(game_state, player)
         elif space["type"] == "treasure":
             return self.treasure_space(game_state)
@@ -1364,6 +1366,7 @@ class ServerGameplay:
 
         game_state["full_moon_active"] = False
         game_state["barricade_active"] = False
+        game_state["prudes_active"] = False
 
         if game_state["kracken_deck"]:
             game_state["kracken_event"] = game_state["kracken_deck"].pop()
@@ -1543,7 +1546,7 @@ class ServerGameplay:
             game_state["full_moon_active"] = True
 
         if event == "Barricade": 
-            game_state["barricade_active"] = True    
+            game_state["barricade_active"] = True
 
         if event == "Bermuda Triangle":
             old_space = game_state["space_lookup"][game_state["captain_space"]]
@@ -1552,7 +1555,10 @@ class ServerGameplay:
             new_space = game_state["space_lookup"][new_space_id]
             game_state["captain_space"] = new_space_id
             new_space["captain"] = True
-            game_state["legal_moves"] = self.refresh_legal_moves(game_state)    
+            game_state["legal_moves"] = self.refresh_legal_moves(game_state)
+
+        if event == "Prudes Prevail":
+            game_state["prudes_active"] = True
 
         game_state["phase"] = "start_turn"      
         return game_state
