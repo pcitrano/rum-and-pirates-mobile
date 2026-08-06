@@ -470,7 +470,7 @@ class game_ui:
                 self.handle_key(event) 
 
             elif event.type == pygame.MOUSEWHEEL:
-                if self.game_state["phase"] == "menu" and ("stats" in self.game_state["menu"]["menu_level"] or self.game_state["menu"]["menu_level"] == "elo"):
+                if self.game_state["phase"] == "menu" and ("stats" in self.game_state["menu"]["menu_level"] or self.game_state["menu"]["menu_level"] in ("elo", "stats_3")):
                     self.game_state["menu"]["stats_scroll"] -= event.y
                     self.game_state["menu"]["stats_scroll"] = max(0, self.game_state["menu"]["stats_scroll"])
 
@@ -862,7 +862,7 @@ class game_ui:
                     self.screen.blit(row_label, (row_rect.x + 10, row_rect.y + (row_h - row_label.get_height()) // 2))
                     self.active_game_rects.append((row_rect, rid))
 
-        if menu["menu_level"] == "stats_1" or menu["menu_level"] == "stats_2" or menu["menu_level"] == "elo":
+        if menu["menu_level"] in ("stats_1", "stats_2", "elo", "stats_3"):
             self.draw_stats()
 
     # ── Settings menu ──────────────────────────────────────────────────────
@@ -1069,13 +1069,51 @@ class game_ui:
                 self.screen.blit(elo_text, (elo_x,y))
                 self.screen.blit(games_text, (games_x,y))
 
-        total = len(players)
-        if total > 2:  #max_visible
-            shown_end = min(scroll + max_visible, total)
-            scroll_text = f"{scroll + 1}-{shown_end} of {total}"
+        if self.game_state["menu"]["menu_level"] == "stats_3":
+            col_labels = ["Wrangle", "Maps", "Pubs", "Supplies", "Rendezvous", "Guards", "Treasure", "Scorpions", "Total"]
+            cat_keys   = ["wrangle", "maps", "pubs", "supplies", "rendezvous", "guards", "treasure", "scorpions", "total"]
+
+            table_x   = 325 / 1600 * self.width
+            table_y   = 430 / 900 * self.height
+            col_width  = 80 / 1600 * self.width
+            row_height = 60
+
+            captain_list = list(captain_stats.keys())
+            cap_scroll = min(scroll, max(0, len(captain_list) - max_visible))
+            self.game_state["menu"]["stats_scroll"] = cap_scroll
+
+            # Angled column headers (same style as stats_1)
+            for j, label in enumerate(col_labels):
+                x = table_x + (j + 1) * col_width + col_width // 2
+                self.draw_angled_label(self.screen, self.font, label, (0, 0, 0), x, table_y, angle=40)
+
+            for row, display_name in enumerate(captain_list[cap_scroll:cap_scroll + max_visible]):
+                data = captain_stats[display_name]
+
+                name_label = self.menu_font.render(display_name, True, (0, 0, 0))
+                self.screen.blit(name_label, (table_x - 65/1600*self.width, table_y + row * row_height))
+
+                for col, key in enumerate(cat_keys):
+                    value = round(data["averages"].get(key, 0))
+                    text  = self.menu_font.render(str(value), True, (0, 0, 0))
+                    x = table_x + (col + 1) * col_width + col_width // 2
+                    y = table_y + row * row_height
+                    self.screen.blit(text, (x, y))
+
+        # Scroll position indicator — uses the right list length per tab
+        if self.game_state["menu"]["menu_level"] == "stats_3":
+            scroll_total = len(captain_stats)
+            scroll_offset = min(scroll, max(0, scroll_total - max_visible))
+        else:
+            scroll_total = len(players)
+            scroll_offset = scroll
+
+        if scroll_total > max_visible:
+            shown_end = min(scroll_offset + max_visible, scroll_total)
+            scroll_text = f"{scroll_offset + 1}-{shown_end} of {scroll_total}"
             scroll_width, _ = self.font.size(scroll_text)
             scroll_label = self.font.render(scroll_text, True, (100, 100, 100))
-            self.screen.blit(scroll_label, ((1600 - scroll_width) / 2 / 1600 * self.width, 755/900*(self.height)))
+            self.screen.blit(scroll_label, ((1600 - scroll_width) / 2 / 1600 * self.width, 755 / 900 * self.height))
 
     # ── Character Selection ──────────────────────────────────────────────────────
     def draw_character_select(self):
@@ -1195,7 +1233,7 @@ class game_ui:
 
             self.build_buttons()
             for button in self.buttons:
-                button.draw(self.screen, self.menu_font)
+                button.draw(self.screen, self.font)
             for button in self.transparent_buttons:
                 button.draw_transparent(self.screen, self.menu_font)
             
@@ -2356,23 +2394,30 @@ class game_ui:
             self.transparent_buttons.append(Button(70/1600*self.width, 511/900*self.height, 280/1600*self.width, 100/900*self.height, "Main Menu", self.return_menu, color=(180, 180, 180), text_color=(255,255,255)))
             self.transparent_buttons.append(Button(70/1600*self.width, 619/900*self.height, 280/1600*self.width, 100/900*self.height,"Quit", self.quit_game, color=(180, 180, 180), text_color=(255,255,255)))
 
-        stat_button_width = 275
-        stat_button_height = 60
+        stat_button_width = 200
+        stat_button_height = 50
         center_x = 800 / 1600 * self.width
-        button1_x = center_x - 50 - 1.5 * stat_button_width
-        button3_x = center_x + .5 * stat_button_width + 50
         
-        if phase == "menu" and (menu_level == "stats_1" or menu_level == "stats_2" or menu_level == "elo"):
+        if phase == "menu" and (menu_level == "stats_1" or menu_level == "stats_2" or menu_level == "elo" or menu_level == "stats_3"):
             self.buttons = []
             self.transparent_buttons = []
-            ga_color = (200, 180, 80) if menu_level == "stats_1" else (145, 145, 145)
-            self.buttons.append(Button(button1_x, 275/900*self.height, stat_button_width, stat_button_height,"Averages", self.toggle_stats_1, color = ga_color))
-            other_color = (200, 180, 80) if menu_level == "stats_2" else (145, 145, 145)
-            self.buttons.append(Button(center_x - stat_button_width/2, 275/900*self.height, stat_button_width, stat_button_height,"Wins", self.toggle_stats_2, color = other_color))
-            elo_color = (200, 180, 80) if menu_level == "elo" else (145, 145, 145)
-            self.buttons.append(Button(button3_x, 275/900*self.height, stat_button_width, stat_button_height,"Leaderboard", self.toggle_elo_leaderboard, color = elo_color))
+            # Four tabs evenly spaced around center
+            tab_gap = 10
+            total_tabs_width = 4 * stat_button_width + 3 * tab_gap
+            tab_start_x = center_x - total_tabs_width / 2
+            tab_y = 275 / 900 * self.height
 
-            self.transparent_buttons.append(Button(center_x - stat_button_width/2, 800/900*self.height, stat_button_width, stat_button_height, "Main Menu", self.return_menu))
+            ga_color = (200, 180, 80) if menu_level == "stats_1" else (145, 145, 145)
+            self.buttons.append(Button(tab_start_x, tab_y, stat_button_width, stat_button_height, "Averages", self.toggle_stats_1, color=ga_color))
+            cap_color = (200, 180, 80) if menu_level == "stats_3" else (145, 145, 145)
+            self.buttons.append(Button(tab_start_x + stat_button_width + tab_gap, tab_y, stat_button_width, stat_button_height, "Captains", self.toggle_stats_3, color=cap_color))
+            other_color = (200, 180, 80) if menu_level == "stats_2" else (145, 145, 145)
+            self.buttons.append(Button(tab_start_x + 2 * (stat_button_width + tab_gap), tab_y, stat_button_width, stat_button_height, "Wins", self.toggle_stats_2, color=other_color))
+            elo_color = (200, 180, 80) if menu_level == "elo" else (145, 145, 145)
+            self.buttons.append(Button(tab_start_x + 3 * (stat_button_width + tab_gap), tab_y, stat_button_width, stat_button_height, "Leaderboard", self.toggle_elo_leaderboard, color=elo_color))
+            
+
+            self.transparent_buttons.append(Button(center_x - stat_button_width / 2, 800 / 900 * self.height, stat_button_width + 75, stat_button_height + 10, "Main Menu", self.return_menu))
 
 
         ########## In Game Buttons ##########
@@ -2735,6 +2780,7 @@ class game_ui:
 
         event_img = event.get("img")
         event_screen = self.ui_images.get(event_img) if event_img else None
+        self.screen.fill((0,0,0))
         if event_screen is not None:
             self.screen.blit(event_screen, (0, 0))
 
@@ -2843,10 +2889,14 @@ class game_ui:
         self.game_state["menu"]["menu_level"] = "stats_2"
         self.game_state["menu"]["stats_scroll"] = 0
 
+    def toggle_stats_3(self):
+            self.game_state["menu"]["menu_level"] = "stats_3"
+            self.game_state["menu"]["stats_scroll"] = 0
+
     def toggle_elo_leaderboard(self):
         self.game_state["menu"]["menu_level"] = "elo"  
         self.game_state["menu"]["stats_scroll"] = 0  
-
+ 
     ######################################################################
     # GAME ACTIONS
     ######################################################################
