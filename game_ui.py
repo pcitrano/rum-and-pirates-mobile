@@ -929,10 +929,8 @@ class game_ui:
         captain_stats = self.save_data.get_captain_averages(self.stats)
 
         players = [name for name, data in player_stats.items() if data["games_played"] >= 3]
-        max_visible = 5  
+        max_visible = 5
         scroll = self.game_state["menu"].get("stats_scroll", 0)
-        scroll = min(scroll, max(0, len(players) - max_visible))
-        self.game_state["menu"]["stats_scroll"] = scroll  
         
         averages = {} 
 
@@ -961,6 +959,9 @@ class game_ui:
             table_y = 430/900*self.height 
             col_width = 80/1600*self.width 
             row_height = 60
+
+            scroll = min(scroll, max(0, len(sorted_players) - max_visible))
+            self.game_state["menu"]["stats_scroll"] = scroll
 
             for j, label in enumerate(col_labels): 
                 x = table_x + (j + 1) * col_width + col_width // 2
@@ -1019,6 +1020,8 @@ class game_ui:
                 key=lambda n: player_stats[n]["wins"],
                 reverse=True
             )
+            scroll = min(scroll, max(0, len(sorted_by_wins) - max_visible))
+            self.game_state["menu"]["stats_scroll"] = scroll
             for row, player_name in enumerate(sorted_by_wins[scroll:scroll + max_visible]):
                 s = player_stats[player_name]
                 games = s["games_played"]
@@ -1045,6 +1048,9 @@ class game_ui:
             y_buffer = 50/900*self.height
             
             leaderboard = [p for p in self.save_data.get_elo_leaderboard() if p["games_played"] >= 3]
+
+            scroll = min(scroll, max(0, len(leaderboard) - max_visible))
+            self.game_state["menu"]["stats_scroll"] = scroll
 
             ######   Headers #############
             name_label_width, _ = self.menu_font.size("Player")
@@ -1079,15 +1085,19 @@ class game_ui:
             row_height = 60
 
             captain_list = list(captain_stats.keys())
-            cap_scroll = min(scroll, max(0, len(captain_list) - max_visible))
-            self.game_state["menu"]["stats_scroll"] = cap_scroll
+            scroll = min(scroll, max(0, len(captain_list) - max_visible))
+            self.game_state["menu"]["stats_scroll"] = scroll
 
-            # Angled column headers (same style as stats_1)
+            # Angled score column headers
             for j, label in enumerate(col_labels):
                 x = table_x + (j + 1) * col_width + col_width // 2
                 self.draw_angled_label(self.screen, self.font, label, (0, 0, 0), x, table_y, angle=40)
 
-            for row, display_name in enumerate(captain_list[cap_scroll:cap_scroll + max_visible]):
+            # "Games" header to the right of the score columns
+            games_col_x = int(table_x + (len(col_labels) + 1) * col_width + col_width // 1.5)
+            self.draw_angled_label(self.screen, self.font, "Games", (0, 0, 0), games_col_x, table_y, angle=40)
+
+            for row, display_name in enumerate(captain_list[scroll:scroll + max_visible]):
                 data = captain_stats[display_name]
 
                 name_label = self.menu_font.render(display_name, True, (0, 0, 0))
@@ -1100,17 +1110,20 @@ class game_ui:
                     y = table_y + row * row_height
                     self.screen.blit(text, (x, y))
 
-        # Scroll position indicator — uses the right list length per tab
+                # Games played
+                games_text = self.menu_font.render(str(data["games_played"]), True, (0, 0, 0))
+                self.screen.blit(games_text, (games_col_x, table_y + row * row_height))
+
+        # Scroll position indicator
         if self.game_state["menu"]["menu_level"] == "stats_3":
             scroll_total = len(captain_stats)
-            scroll_offset = min(scroll, max(0, scroll_total - max_visible))
         else:
             scroll_total = len(players)
-            scroll_offset = scroll
 
+        scroll = self.game_state["menu"].get("stats_scroll", 0)
         if scroll_total > max_visible:
-            shown_end = min(scroll_offset + max_visible, scroll_total)
-            scroll_text = f"{scroll_offset + 1}-{shown_end} of {scroll_total}"
+            shown_end = min(scroll + max_visible, scroll_total)
+            scroll_text = f"{scroll + 1}-{shown_end} of {scroll_total}"
             scroll_width, _ = self.font.size(scroll_text)
             scroll_label = self.font.render(scroll_text, True, (100, 100, 100))
             self.screen.blit(scroll_label, ((1600 - scroll_width) / 2 / 1600 * self.width, 755 / 900 * self.height))
@@ -1228,7 +1241,9 @@ class game_ui:
             self.draw_splash()
             return
         
-        if self.game_state["phase"] == "menu" and self.game_state["menu"]["menu_level"] == "stats_1":
+        if self.game_state["phase"] == "menu" and (self.game_state["menu"]["menu_level"] == "stats_1" or self.game_state["menu"]["menu_level"] == "stats_2"
+            or self.game_state["menu"]["menu_level"] == "elo" or self.game_state["menu"]["menu_level"] == "stats_3"):
+
             self.draw_stats()
 
             self.build_buttons()
@@ -2417,7 +2432,7 @@ class game_ui:
             self.buttons.append(Button(tab_start_x + 3 * (stat_button_width + tab_gap), tab_y, stat_button_width, stat_button_height, "Leaderboard", self.toggle_elo_leaderboard, color=elo_color))
             
 
-            self.transparent_buttons.append(Button(center_x - stat_button_width / 2, 800 / 900 * self.height, stat_button_width + 75, stat_button_height + 10, "Main Menu", self.return_menu))
+            self.transparent_buttons.append(Button(center_x - (stat_button_width+75) / 2, 800 / 900 * self.height, stat_button_width + 75, stat_button_height + 10, "Main Menu", self.return_menu))
 
 
         ########## In Game Buttons ##########
@@ -2890,8 +2905,8 @@ class game_ui:
         self.game_state["menu"]["stats_scroll"] = 0
 
     def toggle_stats_3(self):
-            self.game_state["menu"]["menu_level"] = "stats_3"
-            self.game_state["menu"]["stats_scroll"] = 0
+        self.game_state["menu"]["menu_level"] = "stats_3"
+        self.game_state["menu"]["stats_scroll"] = 0
 
     def toggle_elo_leaderboard(self):
         self.game_state["menu"]["menu_level"] = "elo"  
