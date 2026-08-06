@@ -1497,7 +1497,13 @@ class ServerGameplay:
 
         if event == "Thieves' Revenge":
             for player in game_state["players"]:
-                if player["coins"] > 0:
+                is_midas = (
+                    player["character"] is not None and
+                    player["character"]["name"] == "Captain Midas the Master of Coin"
+                )
+                if is_midas and player["coins"] <= 1:
+                    pass  # Midas is protected when down to their last coin
+                elif player["coins"] > 0:
                     player["coins"] -= 1
 
         if event == "Lost at Sea":
@@ -1577,10 +1583,20 @@ class ServerGameplay:
                 new_captain = captain_deck.pop(random.randrange(len(captain_deck)))
                 old_name = player["character"]["name"] if player.get("character") else "nobody"
                 player["character"] = new_captain
-                self.log_action(
-                    game_state,
-                    f"{player['name']} lost {old_name} to mutiny and now sails under {new_captain['name']}!"
-                )
+
+                # Remove the coin given to Midas at round end
+                if old_name == "Captain Midas the Master of Coin" and player["coins"] > 0:
+                    player["coins"] -= 1 
+                # Give new Midas their coin
+                if new_captain["name"] == "Captain Midas the Master of Coin":
+                    player["coins"] += 1
+                # Give Pete his starting pirate if not at max
+                if new_captain["name"] == "Captain Pete the Popular" and player["pirate_reserve"] > 0:
+                    player["pirates"] += 1
+                    player["pirate_reserve"] -= 1
+                    self.log_action(game_state, f"{player['name']} found a man overboard!")
+                
+                self.log_action(game_state, f"{player['name']} lost {old_name} to mutiny and now sails under {new_captain['name']}!")
             game_state["captain_deck"] = captain_deck
 
         game_state["phase"] = "start_turn"      
