@@ -1560,5 +1560,28 @@ class ServerGameplay:
         if event == "Prudes Prevail":
             game_state["prudes_active"] = True
 
+        if event == "Mutiny":
+            has_captains = any(p.get("character") is not None for p in players)
+
+            if not has_captains:
+                if game_state["kracken_deck"]:
+                    game_state["kracken_event"] = game_state["kracken_deck"].pop()
+                    return self.kracken_event(game_state)
+                game_state["phase"] = "start_turn"
+                return game_state
+
+            captain_deck = game_state.get("captain_deck", [])
+            for player in players:
+                if not captain_deck:
+                    break
+                new_captain = captain_deck.pop(random.randrange(len(captain_deck)))
+                old_name = player["character"]["name"] if player.get("character") else "nobody"
+                player["character"] = new_captain
+                self.log_action(
+                    game_state,
+                    f"{player['name']} lost {old_name} to mutiny and now sails under {new_captain['name']}!"
+                )
+            game_state["captain_deck"] = captain_deck
+
         game_state["phase"] = "start_turn"      
         return game_state

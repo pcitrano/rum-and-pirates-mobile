@@ -391,6 +391,7 @@ class ServerGameSetup:
             {"event": "Barricade", "img": "cok_barricade.png"},
             {"event": "Bermuda Triangle", "img": "cok_bermuda.png"},
             {"event": "Prudes Prevail", "img": "cok_prudes.png"},
+            {"event": "Mutiny", "img": "cok_mutiny.png"},
         ]
 
         random.shuffle(kracken)
@@ -433,6 +434,7 @@ class ServerGameSetup:
             "character_hands": [],
             "character_selections": [None] * num_players,
             "character_confirmed": [False] * num_players,
+            "captain_deck": [],
             "starting_player": 0,
             "active_player": 0,
             "round": 1,
@@ -488,15 +490,34 @@ class ServerGameSetup:
         game_state["captain_space"] = new_start
         game_state["legal_moves"] = game_state["captain_graph"][new_start]
 
+    def build_captain_deck(self, all_characters, selected_names):
+        """
+        Returns a shuffled list of every captain card that was NOT chosen by
+        any player during character selection.  This becomes the reserve deck
+        used by the Mutiny kraken event.
+
+        all_characters : the full list of character dicts (name + image).
+        selected_names : iterable of the character names that were picked.
+        """
+        chosen = set(selected_names)
+        remaining = [c for c in all_characters if c["name"] not in chosen]
+        random.shuffle(remaining)
+        return remaining
+
     def finish_character_select(self, game_state, random_start=False):
         hands = game_state.get("character_hands", [])
         selections = game_state.get("character_selections", [])
+
+        # Flatten all dealt cards so we know the full pool that was in play.
+        all_dealt = [card for hand in hands for card in hand]
+        selected_names = []
 
         for i, player in enumerate(game_state["players"]):
             selected_name = selections[i]
             hand = hands[i]
             character = next((c for c in hand if c["name"] == selected_name), hand[0])
             player["character"] = character
+            selected_names.append(character["name"])
 
             # Captain Pete the Popular — starts with one extra pirate
             if character["name"] == "Captain Pete the Popular" and player["pirate_reserve"] > 0:
@@ -505,6 +526,10 @@ class ServerGameSetup:
 
             if character["name"] == "Captain Midas the Master of Coin":
                 player["coins"] += 1
+
+        # Build the Mutiny reserve: all dealt captains that nobody chose,
+        # shuffled and stored so the kraken event can draw from them.
+        game_state["captain_deck"] = self.build_captain_deck(all_dealt, selected_names)
 
         game_state.pop("character_hands", None)
         game_state.pop("character_selections", None)
