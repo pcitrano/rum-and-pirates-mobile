@@ -686,7 +686,7 @@ class game_ui:
 
             count_text = f"Players: {menu['player_count']}"
             count_label_width, _ = self.menu_font.size(count_text)
-            count_label_x = ((((490/1600*self.width) - count_label_width) / 2) + 100/1600*self.width) / 1600 * self.width
+            count_label_x = (((490 - count_label_width) / 2) + 100) / 1600 * self.width
             count_label = self.menu_font.render(count_text, True, (0, 0, 0))
             self.screen.blit(count_label, (count_label_x, 275/900*self.height))
 
@@ -1680,10 +1680,11 @@ class game_ui:
         self.screen.blit(img, (treasure_x, y))
 
         card = tableau["scorpion"]
-        image_key = card.get("image_file")
-        scorpion_x = treasure_x + card_width + 2* padding
-        img = pygame.transform.smoothscale(self.card_images[image_key], (card_width, card_height))
-        self.screen.blit(img, (scorpion_x, y))
+        if card:
+            image_key = card.get("image_file")
+            scorpion_x = treasure_x + card_width + 2* padding
+            img = pygame.transform.smoothscale(self.card_images[image_key], (card_width, card_height))
+            self.screen.blit(img, (scorpion_x, y))
 
         y += 77 / 750 * self.height
         # Wrangle
@@ -2944,14 +2945,16 @@ class game_ui:
         self.send_action({"type": "supply_choice", "keep_card": accepted})
 
     def resolve_har_supply(self, accepted):
-        chosen = self.game_state.get("har_selection")
         chosen_index = None
-        if chosen is not None:
-            har_supply = self.game_state.get("har_supply", [])
-            for i, card in enumerate(har_supply):
-                if card == chosen:
-                    chosen_index = i
-                    break
+        if accepted:
+            chosen = self.game_state.get("har_selection")
+            if chosen is not None:
+                card_a = self.game_state.get("supply")
+                card_b = self.game_state.get("har_supply")
+                if card_a and chosen.get("image_file") == card_a.get("image_file"):
+                    chosen_index = 0
+                elif card_b and chosen.get("image_file") == card_b.get("image_file"):
+                    chosen_index = 1
         self.send_action({"type": "har_supply_choice", "chosen_index": chosen_index})
     
     def resolve_rendezvous(self):

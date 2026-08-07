@@ -1132,6 +1132,21 @@ class ServerGameplay:
         card_3 = game_state["tableau"]["wrangle_bedroll"]
 
         active = self.active_players(game_state)
+
+        # Nobody joined the wrangle — no cards are awarded.
+        if not active:
+            self.log_action(game_state, "Nobody joined the wrangle — the bunks go unclaimed!")
+            game_state["wrangle"]["active"] = False
+            self.score_players(game_state)
+            if game_state["round"] == 5:
+                game_state["phase"] = "game_over"
+                return game_state
+            # Refresh all three wrangle tableau slots for the next round.
+            game_state["tableau"]["wrangle_bunk"] = game_state["decks"]["wrangle_bunk"].pop()
+            game_state["tableau"]["wrangle_hammock"] = game_state["decks"]["wrangle_hammock"].pop()
+            game_state["tableau"]["wrangle_bedroll"] = game_state["decks"]["wrangle_bedroll"].pop()
+            return self.round_end(game_state)
+
         winner_id = active[0]
 
         id_to_index = {
