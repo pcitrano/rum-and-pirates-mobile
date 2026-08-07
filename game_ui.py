@@ -217,9 +217,6 @@ class game_ui:
         self.chat_read_messages = None
         self.chat_notification = False
 
-        if self.rules is not None:
-            self.rules.broadcast = self.broadcast_state
-
     def run(self):
         clock = pygame.time.Clock()
         while self.running:
@@ -552,7 +549,6 @@ class game_ui:
                     my_index = self.my_player_index if self.my_player_index is not None else 0
                     self.game_state["character_selections"][my_index] = character["name"]
                     self.build_buttons()
-                    self.broadcast_state()
                     return
                 
         if self.game_state["phase"] == "har_supply":
@@ -560,7 +556,6 @@ class game_ui:
                 if rect.collidepoint(x, y):
                     self.game_state["har_selection"] = card
                     self.build_buttons()
-                    self.broadcast_state()
                     return
 
         if self.game_state["phase"] == "start_kracken":
@@ -2706,14 +2701,6 @@ class game_ui:
         self.game_state["menu"]["menu_level"] = "stats_1"
     
     def start_multiplayer_game(self):
-        """
-        Ask the server to build the full game state and broadcast it to all
-        clients.  We no longer generate the board or shuffle players locally.
-        The server's on_new_game handler (server.py) calls
-        board_setup.new_game_state() and emits state_updated to everyone.
-        my_player_index is resolved later inside apply_network_state() when
-        the state_updated payload arrives with the shuffled player list.
-        """
         self.network.sio.emit("new_game", {
             "room_id": self.room_id,
             "play_with_characters": self.save_data.settings.get("play_with_characters", False),
@@ -2847,18 +2834,18 @@ class game_ui:
         self.running = False
 
     def on_game_over(self):
-        import threading
-        threading.Thread(
-            target=self.save_data.record_game_result,
-            args=(self.game_state["players"],),
-            daemon=True
-        ).start()
+        if not self.network:
+            import threading
+            threading.Thread(
+                target=self.save_data.record_game_result,
+                args=(self.game_state["players"],),
+                daemon=True
+            ).start()
         if self.my_player_index is not None:
             my_name = self.game_state["players"][self.my_player_index]["name"]
             self.save_data.settings["player_name"] = my_name
             self.save_data.save_settings()
         self.build_buttons()
-        self.broadcast_state()
 
     ######################################################################
     # SETTINGS
@@ -3020,20 +3007,7 @@ class game_ui:
     # NETWORKING
     ######################################################################
 
-    # ── State broadcast and serialisation ──────────────────────────────────────────────────────
-    def broadcast_state(self):
-        """Send game state to other players after any action."""
-        if self.network and self.network.connected:
-            serializable = self.get_serializable_state()
-            self.network.send_state(serializable)
-
     def send_action(self, action: dict):
-        """
-        Send a player_action to the server.  The server mutates game_state
-        and broadcasts state_updated back to all clients — we do NOT update
-        local state here.  Falls back to the old local-rules path when
-        there is no network connection (local/solo play).
-        """
         if self.network and self.network.connected and self.room_id:
             action["room_id"] = self.room_id
             self.network.sio.emit("player_action", action)
